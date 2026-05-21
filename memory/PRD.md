@@ -3,125 +3,106 @@
 ## Original Problem Statement
 > "please refer to this app, check for any bugs and errors, and give me ideas to improve it"
 
-User then approved scope across two sessions:
-1. **Session 1**: "ok lets ship the fixes" — shipped 11 critical/major bug fixes
-2. **Session 2**: "Ship the top 5 highest-impact improvements" — shipped 5 feature improvements
+Subsequent user directives:
+1. "ok lets ship the fixes" — shipped 11 critical/major bug fixes (Session 1)
+2. "Ship the top 5 highest-impact improvements" — shipped 5 features (Session 2)
+3. "lets implement, A2, A4, C13, B10, also make the chess pieces and name in capital letters like E4 etc" — shipped 4 more features + capitalization (Session 3)
 
 ## Architecture
-- **Frontend-only Next.js 16.2.6** (Turbopack) — no separate backend.
+- **Frontend-only Next.js 16.2.6** (Turbopack) — no backend.
 - React 19 · TypeScript (strict) · Zustand · chess.js · framer-motion 12.
-- **Stockfish** Web Worker (`/public/stockfish.js` + `.wasm`).
-- **Firebase** (Auth + Firestore + RTDB) for multiplayer rooms.
-- **Procedural sound** via Web Audio API (no audio files in the bundle).
-- All gameplay state lives in `src/lib/gameStore.ts`; persistent fields saved to `localStorage` (`chess_kids_saved_data` + `chess_kids_sound_muted`).
+- **Stockfish** Web Worker for AI.
+- **Firebase** (Auth + Firestore + RTDB) for multiplayer.
+- **Procedural audio** via Web Audio API (no asset files).
+- **All gameplay state** in `src/lib/gameStore.ts`; persistent fields in `localStorage`.
 
 ## User Personas
 - **Primary:** Kids aged 10–12 learning chess.
 - **Secondary:** Parents / teachers.
 
-## Core Requirements
+## Core Requirements (cumulative)
 1. Tutorial for 6 pieces + check/checkmate.
 2. Vs-AI play (Squire → King) powered by Stockfish.
 3. Tactical puzzles ("Quest Map") with hints & rewards.
 4. Achievement system (13 badges + coins).
 5. Shop ("Armoury") for board themes & wizard skins.
-6. Time Spell mechanic for blunder rewinds.
+6. Time Spell blunder rewind mechanic.
 7. Friend-vs-friend multiplayer via room codes.
-8. **NEW: Move-quality coaching feedback** (instant Brilliant/Great/Sharp/Blunder badges).
-9. **NEW: Sound design** (procedural Web Audio tones).
-10. **NEW: Daily Quest + streak counter** (Duolingo-style retention loop).
-11. **NEW: Piece slide animations** between squares.
-12. **NEW: Shareable Victory PNG** generated client-side via Canvas.
+8. Move-quality coaching feedback (Brilliant/Great/Sharp/Blunder badges).
+9. Procedural sound design (Web Audio tones).
+10. Daily Quest + streak counter.
+11. Piece slide animations.
+12. Shareable Victory PNG (Canvas).
+13. **NEW: Tactical motif naming** (wizard explains forks, pins, skewers, discoveries).
+14. **NEW: Endgame Trainer** (K+Q, K+R, K+2R, K+P drills with par-move bonus).
+15. **NEW: Coach Replay** (interactive game review with per-move classification).
+16. **NEW: Stacked captured pieces + material badge** (Battle Trophies UI).
+17. **NEW: Uppercase chess notation** (A-H board labels, uppercase SAN in modals).
 
 ## What's Been Done
 
-### 2026-01-XX — Session 1: Bug audit + 11 critical/major fixes
-- Reviewed full codebase, produced prioritized bug report (37 items).
-- Shipped:
-  1. Coins/badges auto-persist on earn.
-  2. Puzzles work after toggling "Play as Black".
-  3. Time Spell atomic locking, no double-cast.
-  4. Time Spell decline forces AI to play the warned move.
-  5. Multiplayer: `update()` instead of overwrite, history+captured sync, listener cleanup.
-  6. Tightened Time Spell trigger threshold (capture ≥3 + checkmate only).
-  7. Added missing "King's Conqueror" achievement (13 badges total).
-  8. CapturedPieces color renders correctly for both player sides.
-  9. Fixed invalid `<Link><button>` HTML on home.
-  10. `useMemo` for `calculateTerritory` now uses `fen` (heatmap freshness).
-  11. JOIN button no longer overflows its panel.
+### Session 1 — Bug audit + 11 critical/major fixes (see prior PRD versions)
 
-### 2026-01-XX — Session 2: Top 5 high-impact improvements
-- **A1 — Move-quality coaching** (`src/lib/moveQuality.ts`): heuristic classifier returns
-  Brilliant / Great / Good / Sharp / Safe / Promotion / Risky / Blunder based on
-  capture value, defender/attacker counts, check, promotion, castling, checkmate.
-  Wired into `makeMove` → store `lastMoveQuality`. Displayed as a floating badge
-  above the destination square (framer-motion) — only fires for noteworthy moves
-  (signal not noise; ordinary developing moves return null).
-- **B7 — Piece slide animations**: framer-motion `motion.span` for every piece, with
-  `initial={{ x: deltaX, y: deltaY }}` computed from `lastMove.from → lastMove.to`
-  expressed as % of square width. Spring transition (stiffness 380, damping 30).
-- **B8 — Procedural sound design** (`src/lib/sounds.ts`): Web Audio API oscillators
-  with envelopes for select / move / capture / check / checkmate / loss / badge /
-  coins. Header sound toggle (🔊/🔇) persists to localStorage. No audio files in
-  the bundle. Auto-unlocks AudioContext on first pointer event (iOS Safari fix).
-- **C11 — Daily Quest + streak counter** (`src/lib/daily.ts`):
-  - Deterministic puzzle pick from PUZZLES indexed by day-since-epoch.
-  - Featured card on Quest Map showing today's puzzle, 2× gold bonus, streak fire emoji.
-  - Streak increments on consecutive days, resets on miss.
-  - Bonus reward only awarded once per day.
-  - Today's daily quest gets a star + golden glow on the quest map.
-- **D16 — Shareable Victory PNG** (`src/lib/shareCard.ts`):
-  - Canvas-based 800×1040 card with gradient background, title, difficulty pill,
-    rendered final board, footer branding.
-  - Triggered from a new "📸 Share Victory" button in the game-over modal (win only).
-  - Auto-downloads + copies PNG to clipboard (where supported).
-  - Toast notification confirms saved + copied.
+### Session 2 — Top 5 improvement features (see prior PRD versions)
 
-### Verification (both sessions)
+### Session 3 — 4 improvement features + capitalization (current)
+- **A2 Tactical motif naming** (`src/lib/motifs.ts`):
+  - Detects FORK (piece attacks ≥2 valuable enemy pieces)
+  - Detects PIN / SKEWER (sliding piece with two enemy pieces behind on the same ray)
+  - Detects DISCOVERED ATTACK (moving a piece uncovers a friendly attacker)
+  - Detects BIG THREAT (single high-value undefended target)
+  - Verified live: PIN message after Bc4 ("📌 PIN! The enemy Pawn is stuck — if it moves, your Bishop will capture the Knight behind it!")
+- **A4 Endgame Trainer** (`src/lib/endgameDrills.ts` + `src/app/components/EndgameTrainer.tsx`):
+  - 4 drills: K+Q vs K, K+R vs K, K+2R ladder mate, K+P vs K promotion
+  - Par-moves system with 2× gold bonus for completing under par
+  - New "Endgame Trainer" tab in game header
+  - Squire AI plays the lone king (semi-random) — gives kids the chase satisfaction
+  - Exit Drill button to return to drill menu
+- **C13 Coach Replay** (`src/app/components/CoachReplay.tsx`):
+  - "📜 Review Game" button in the game-over modal
+  - Modal with mini 8×8 board + commentary panel
+  - Each move shows: SAN (uppercase), quality badge, tactical motif explanation if any
+  - Prev/Next navigation with progress counter
+  - Frames are re-derived from `moveHistory` using the same classifier + motif detector
+- **B10 Stacked Captured Pieces + material badge** (`src/app/components/CapturedPieces.tsx` rewrite):
+  - Overlapping stack design (-9px margin) like Chess.com
+  - Pieces sorted by value (Q→R→B→N→P) so the stack reads trophy-pile style
+  - Hover lifts piece for inspection
+  - Live material advantage badge (e.g., `+3` green or `-3` red) in the header
+  - "BATTLE TROPHIES" Cinzel-serif heading
+- **Capitalization tweak**:
+  - Board file labels A–H (was a–h)
+  - Time Spell modal renders move SAN uppercase (`DXC4` instead of `dxc4`)
+  - Coach Replay shows all move SANs uppercase
+  - Wizard messages about specific moves use `.toUpperCase()`
+
+### Verification
 - ✅ `next build` clean
 - ✅ `tsc --noEmit` clean
-- ✅ `eslint .` clean (1 intentional `eslint-disable-next-line` for the `useMemo` dep)
-- ✅ Playwright runs: confirmed sound toggle persists; daily quest card renders with
-  Windmill puzzle and 🔥 streak; Time Spell warning still fires correctly (regression
-  validation); puzzles work after "Play as Black"; auto-save catches the First Step
-  badge + 5 gold within 1 move.
+- ✅ `eslint .` clean (2 intentional `eslint-disable-next-line` comments for known-good patterns)
+- ✅ Playwright run: all features live-verified:
+  - Endgame Trainer tab + 4 drill cards rendered with par-move/reward labels
+  - Queen Endgame drill loads correctly (K e5/d1/e1, AI king dodges intelligently)
+  - PIN motif fires live in normal gameplay after Bc4 vs developed knight
+  - "⚡ Sharp Check!" badge appears after Ra5+
+  - Uppercase file labels A-H rendered on top + bottom
+  - BATTLE TROPHIES panel shows `-3` red badge when material is lost
+  - Time Spell warning still fires on hung bishop (Bug #11 regression-clean)
 
 ## Prioritized Backlog
 
-### Remaining from the original 22 improvement ideas
-**A. Educational Depth (3/5 remaining):**
-- A2 — Wizard names tactical motifs ("That was a FORK!").
-- A3 — Opening Trainer mini-quest (Italian, Ruy Lopez, Scandinavian).
-- A4 — Endgame drills (K+Q vs K, K+R vs K).
-- A5 — Adaptive difficulty suggestions.
+### Remaining from the 22 improvement ideas (9 shipped so far)
+**A. Educational Depth:** A3 (Opening trainer), A5 (Adaptive difficulty)
+**B. UX/Visual:** B6 (resolve identity tension), B9 (subtler AI indicator)
+**C. Engagement:** C12 (wizard personality voice lines), C14 (avatar/hero), C15 (hall of fame)
+**D. Distribution:** D17 (multiplayer challenge links), D18 (print-and-play PDFs)
+**E. Tech Debt:** E19, E20, E21, E22 (refactoring, all 4 still pending)
 
-**B. UX / Visual Polish (3/5 remaining):**
-- B6 — Resolve purple-cosmic vs medieval-gold identity tension.
-- B9 — Subtler "AI thinking" indicator (glow AI pieces vs board overlay).
-- B10 — Captured-pieces stacked-overlap style + material badge.
-
-**C. Engagement / Retention (4/5 remaining):**
-- C12 — Wizard personality voice lines (30+ per emotion).
-- C13 — Coach Replay after game over.
-- C14 — Avatar/hero customization beyond wizard skin.
-- C15 — Local hall of fame.
-
-**D. Distribution Hooks (2/3 remaining):**
-- D17 — "Copy challenge link" for multiplayer.
-- D18 — Print-and-play tactics sheets PDF.
-
-**E. Tech Debt (4/4 remaining):**
-- E19 — Wire up `firebaseService.ts`, delete duplicate MP logic in store.
-- E20 — Single auto-save helper for persistent fields.
-- E21 — `useStockfish` hook owning worker lifecycle.
-- E22 — Extract `<Piece>` and `<Heatmap>` components from ChessBoard.
-
-### Known minor issues still in code
-- Wizard speech bubble auto-dismisses 5s during pendingTimeSpell modal (cosmetic).
-- Tutorial "Board" lesson renders an empty board (intentional `click_sequence` mode).
+### Known minor issues
+- Wizard speech bubble auto-dismisses 5s during pendingTimeSpell (cosmetic).
+- Tutorial "Board" lesson empty board (intentional `click_sequence`).
 - Mobile responsive audit pending.
 
 ## Next Action Items
-- Continue with remaining improvements from the backlog (A2, A4, C13 are the
-  highest-leverage educational wins; B6 + B10 are the highest-leverage visual wins).
-- End-to-end multiplayer test with two real browsers.
+- Real two-browser multiplayer end-to-end test.
+- Highest-leverage next improvement: **A3 Opening Trainer** (would complete the educational trilogy: tactics from Quest Map, motifs from real games, openings as guided 4-move stories) or **C12 Wizard personality voice lines** (30+ per emotion for character depth).

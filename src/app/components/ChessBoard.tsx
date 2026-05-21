@@ -199,12 +199,12 @@ export default function ChessBoard() {
                     </motion.div>
                   )}
 
-                  {/* Corner labels for a1 rank/file */}
+                  {/* Corner labels for a1 rank/file (display files UPPERCASED for kids) */}
                   {fi === 0 && (
                     <span className={styles.cornerRank}>{rank}</span>
                   )}
                   {ri === 7 && (
-                    <span className={styles.cornerFile}>{file}</span>
+                    <span className={styles.cornerFile}>{file.toUpperCase()}</span>
                   )}
                 </div>
               );
@@ -223,11 +223,11 @@ export default function ChessBoard() {
         )}
       </div>
 
-      {/* File labels (bottom) */}
+      {/* File labels (bottom) — uppercase like a real chess board ledger */}
       <div className={styles.fileLabelsRow}>
         <div className={styles.fileLabels}>
           {displayFiles.map(file => (
-            <span key={file} className={styles.fileLabel}>{file}</span>
+            <span key={file} className={styles.fileLabel}>{file.toUpperCase()}</span>
           ))}
         </div>
       </div>

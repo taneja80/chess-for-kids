@@ -17,14 +17,17 @@ import TimeSpellModal from '../components/TimeSpellModal';
 import ArmouryShop from '../components/ArmouryShop';
 import QuestMap from '../components/QuestMap';
 import PuzzleControls from '../components/PuzzleControls';
+import EndgameTrainer from '../components/EndgameTrainer';
+import CoachReplay from '../components/CoachReplay';
 import styles from './page.module.css';
 
 export default function GamePage() {
   const router = useRouter();
   const stockfishReady = useRef(false);
-  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'armoury'>('arena');
+  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'armoury'>('arena');
   const [soundOn, setSoundOn] = useState(true);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [replayOpen, setReplayOpen] = useState(false);
 
   const {
     chess, fen, phase, mode, playerColor,
@@ -34,6 +37,8 @@ export default function GamePage() {
     moveHistory,
     loadSavedData,
     pendingTimeSpell,
+    activeEndgameId,
+    exitEndgameMode,
   } = useGameStore();
 
   // ── Init sound system on first user interaction ──
@@ -116,10 +121,10 @@ export default function GamePage() {
     }
   }, [chess, playerColor, difficulty, setAiThinking, makeMove, setWizardMessage]);
 
-  // Watch for turn changes to trigger AI
+  // Watch for turn changes to trigger AI (vs-ai and endgame drills both use AI).
   useEffect(() => {
     if (phase !== 'playing') return;
-    if (mode !== 'vs-ai') return;
+    if (mode !== 'vs-ai' && mode !== 'endgame') return;
     if (pendingTimeSpell) return; // Pause AI when Time Spell warning is active
     if (chess.turn() !== playerColor && !aiThinking) {
       // Small delay for natural feel
@@ -179,6 +184,12 @@ export default function GamePage() {
           🗺️ Quest Map
         </button>
         <button
+          className={activeTab === 'endgame' ? styles.tabNavActive : styles.tabNavBtn}
+          onClick={() => setActiveTab('endgame')}
+        >
+          🛡️ Endgame Trainer
+        </button>
+        <button
           className={activeTab === 'armoury' ? styles.tabNavActive : styles.tabNavBtn}
           onClick={() => setActiveTab('armoury')}
         >
@@ -190,6 +201,9 @@ export default function GamePage() {
       <main className={styles.main}>
         {activeTab === 'quests' && (
           <QuestMap onAttemptQuest={() => setActiveTab('arena')} />
+        )}
+        {activeTab === 'endgame' && (
+          <EndgameTrainer onEnterDrill={() => setActiveTab('arena')} />
         )}
         {activeTab === 'armoury' && (
           <ArmouryShop />
@@ -208,6 +222,18 @@ export default function GamePage() {
               {mode === 'puzzle' && (
                 <div className={styles.puzzleIndicator}>
                   🎯 Active Quest: Solve the Puzzle to Win!
+                </div>
+              )}
+              {mode === 'endgame' && activeEndgameId && (
+                <div className={styles.endgameIndicator}>
+                  🛡️ Endgame Drill — Force checkmate to complete!
+                  <button
+                    type="button"
+                    className={styles.exitDrillBtn}
+                    onClick={() => { exitEndgameMode(); setActiveTab('endgame'); }}
+                  >
+                    Exit Drill
+                  </button>
                 </div>
               )}
               <ChessBoard />
@@ -262,6 +288,15 @@ export default function GamePage() {
                   📸 Share Victory
                 </button>
               )}
+              {moveHistory.length > 0 && (
+                <button
+                  id="btn-review-game"
+                  className="btn btn-primary"
+                  onClick={() => setReplayOpen(true)}
+                >
+                  📜 Review Game
+                </button>
+              )}
               <button
                 id="btn-play-again"
                 className="btn btn-gold"
@@ -283,6 +318,9 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      {/* Coach Replay modal — accessible whenever moves have been played */}
+      <CoachReplay open={replayOpen} onClose={() => setReplayOpen(false)} />
     </div>
   );
 }

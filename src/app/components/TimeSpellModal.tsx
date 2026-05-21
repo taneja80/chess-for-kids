@@ -14,7 +14,8 @@ export default function TimeSpellModal() {
 
   if (!pendingTimeSpell) return null;
 
-  const opponentMoveSan = pendingTimeSpell.opponentMove?.san || 'a strong move';
+  // Display the move in uppercase like a chess scoresheet (KIDS prefer big letters).
+  const opponentMoveSan = (pendingTimeSpell.opponentMove?.san || 'a strong move').toUpperCase();
 
   return (
     <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-labelledby="modal-title">

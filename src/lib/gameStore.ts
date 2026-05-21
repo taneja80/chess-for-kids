@@ -6,8 +6,10 @@ import { Difficulty } from './stockfish';
 import { rtdb } from './firebase';
 import { ref, set as setDb, onValue, get as getDb, update as updateDb, off } from 'firebase/database';
 import { PUZZLES } from './gameData';
+import { ENDGAME_DRILLS, EndgameDrill } from './endgameDrills';
 import { calculateTerritory } from './territory';
 import { classifyMove, MoveQuality } from './moveQuality';
+import { detectMotif, Motif } from './motifs';
 import { getDailyPuzzleId, getTodayDateStr, nextStreak } from './daily';
 import { playMove, playCapture, playCheck, playCheckmate, playLoss, playBadge, playCoins, playSelect } from './sounds';
 
@@ -25,7 +27,7 @@ export interface Badge {
 }
 
 export type GamePhase = 'home' | 'tutorial' | 'playing' | 'gameover';
-export type GameMode  = 'vs-ai' | 'vs-friend' | 'puzzle';
+export type GameMode  = 'vs-ai' | 'vs-friend' | 'puzzle' | 'endgame';
 export type PlayerColor = 'w' | 'b';
 
 export interface CapturedPieces {
@@ -96,6 +98,13 @@ export interface GameState {
   lastMoveQuality: MoveQuality | null;
   lastMoveQualityAt: number; // ms timestamp so re-renders can re-trigger the badge animation
 
+  // Tactical motif detected on the last player move (informs wizard commentary)
+  lastMoveMotif: Motif | null;
+
+  // Endgame Drill mode
+  activeEndgameId: string | null;
+  endgameMoveCount: number; // tracks moves played in current drill
+
   // Daily Quest tracking
   dailyStreak: number;
   dailyBestStreak: number;
@@ -126,6 +135,8 @@ export interface GameState {
   resetActivePuzzle:  () => void;
   exitPuzzleMode:     () => void;
   usePuzzleHint:      () => void;
+  startEndgame:       (endgameId: string) => void;
+  exitEndgameMode:    () => void;
   toggleHeatmap:      () => void;
   castTimeSpell:      () => void;
   declineTimeSpell:   () => void;
@@ -246,6 +257,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastMoveQuality: null,
   lastMoveQualityAt: 0,
 
+  lastMoveMotif: null,
+
+  activeEndgameId: null,
+  endgameMoveCount: 0,
+
   dailyStreak: 0,
   dailyBestStreak: 0,
   lastDailyDate: null,
@@ -288,7 +304,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Make a move ────────────────────────────
   makeMove: (from, to, promotion) => {
     const { chess, history, moveHistory, playerColor, difficulty } = get();
-    
+
+    // Snapshot the position BEFORE the move so we can detect tactical motifs.
+    const fenBefore = chess.fen();
+
     // Check if promotion needed
     const piece = chess.get(from);
     if (piece?.type === 'p') {
@@ -323,6 +342,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     const isPlayerMoveForQuality = move.color === playerColor;
     const newQuality = isPlayerMoveForQuality ? classifyMove(chess, move, playerColor) : null;
 
+    // Detect tactical motif (fork/pin/skewer/discovered) for player moves only.
+    let newMotif: Motif | null = null;
+    if (isPlayerMoveForQuality) {
+      try {
+        const chessBefore = new Chess(fenBefore);
+        newMotif = detectMotif(chessBefore, chess, move, playerColor);
+      } catch {
+        newMotif = null;
+      }
+    }
+
     set({
       fen: newFen,
       history: newHistory,
@@ -334,7 +364,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       lastMoveQuality: newQuality,
       lastMoveQualityAt: Date.now(),
+      lastMoveMotif: newMotif,
     });
+
+    // If we detected a tactical motif, surface it through the wizard so the kid
+    // learns the name of the pattern they just executed.
+    if (newMotif && !chess.isGameOver()) {
+      get().setWizardMessage(`${newMotif.icon} ${newMotif.title} ${newMotif.explanation}`, 'excited');
+    }
 
     // ── Sound effects (procedural, fire-and-forget) ─────────────────────
     if (chess.isCheckmate()) {
@@ -477,6 +514,24 @@ export const useGameStore = create<GameState>((set, get) => ({
           addCoins(50);
         }
       }
+
+      // Endgame drill completion reward
+      if (get().mode === 'endgame' && get().activeEndgameId) {
+        const drill = ENDGAME_DRILLS.find(d => d.id === get().activeEndgameId);
+        if (drill) {
+          const playerMovesUsed = newMoveHistory.filter(m => m.color === playerColor).length;
+          const onPar = playerMovesUsed <= drill.parMoves;
+          const reward = onPar ? drill.reward * 2 : drill.reward;
+          addCoins(reward);
+          setWizardMessage(
+            onPar
+              ? `${drill.icon} Perfect! Completed in ${playerMovesUsed} moves (par ${drill.parMoves}) — bonus 2× gold: ${reward} coins!`
+              : `${drill.icon} Drill complete in ${playerMovesUsed} moves — ${reward} gold earned!`,
+            'excited'
+          );
+        }
+      }
+
       set({ phase: 'gameover' });
     }
 
@@ -576,6 +631,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingTimeSpell: null,
       lastMoveQuality: null,
       lastMoveQualityAt: 0,
+      lastMoveMotif: null,
+      // Reset mode to vs-ai (clears any lingering puzzle/endgame state)
+      mode: 'vs-ai',
+      activePuzzleId: null,
+      puzzleSolved: false,
+      puzzleHintsUsed: 0,
+      activeEndgameId: null,
+      endgameMoveCount: 0,
     });
   },
 
@@ -864,6 +927,50 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().newGame();
   },
 
+  // ── Endgame drill mode ────────────────────────
+  startEndgame: (endgameId: string) => {
+    const drill: EndgameDrill | undefined = ENDGAME_DRILLS.find(d => d.id === endgameId);
+    if (!drill) return;
+    const chess = new Chess(drill.fen);
+    set({
+      mode: 'endgame',
+      activeEndgameId: endgameId,
+      activePuzzleId: null,
+      puzzleSolved: false,
+      chess,
+      fen: chess.fen(),
+      history: [chess.fen()],
+      moveHistory: [],
+      playerColor: chess.turn(),  // play whichever side has to move (always white in our drills)
+      // Easiest AI for kids — Squire = semi-random king shuffling.
+      difficulty: 'squire',
+      selectedSquare: null,
+      validMoves: [],
+      lastMove: null,
+      aiThinking: false,
+      capturedPieces: { w: [], b: [] },
+      pendingPromotion: null,
+      pendingTimeSpell: null,
+      timeSpellsRemaining: 3,
+      lastMoveQuality: null,
+      lastMoveQualityAt: 0,
+      lastMoveMotif: null,
+      endgameMoveCount: 0,
+      phase: 'playing',
+      wizardMessage: `${drill.icon} ${drill.title}: ${drill.description}`,
+      wizardEmotion: 'happy',
+    });
+  },
+
+  exitEndgameMode: () => {
+    set({
+      mode: 'vs-ai',
+      activeEndgameId: null,
+      endgameMoveCount: 0,
+    });
+    get().newGame();
+  },
+
   usePuzzleHint: () => {
     const { activePuzzleId, puzzleHintsUsed } = get();
     if (!activePuzzleId) return;
@@ -903,7 +1010,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({
         chess: tempChess,
         fen: tempChess.fen(),
-        wizardMessage: `🔮 Future Revealed: The opponent will play ${pendingTimeSpell.opponentMove.san}! Rewinding timeline…`,
+        wizardMessage: `🔮 Future Revealed: The opponent will play ${pendingTimeSpell.opponentMove.san.toUpperCase()}! Rewinding timeline…`,
         wizardEmotion: 'warning'
       });
     } catch {}
