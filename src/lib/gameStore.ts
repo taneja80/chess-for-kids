@@ -116,6 +116,10 @@ export interface GameState {
   dailyBestStreak: number;
   lastDailyDate: string | null;
 
+  // Adaptive Difficulty — track last 5 results per AI level and a current suggestion.
+  aiRecord: Record<Difficulty, ('w' | 'l' | 'd')[]>;
+  suggestedDifficulty: Difficulty | null;
+
   // Actions
   selectSquare:       (square: Square) => void;
   makeMove:           (from: Square, to: Square, promotion?: string) => boolean;
@@ -145,6 +149,9 @@ export interface GameState {
   exitEndgameMode:    () => void;
   startOpening:       (openingId: string) => void;
   exitOpeningMode:    () => void;
+  recordAiResult:     (result: 'w' | 'l' | 'd') => void;
+  acceptSuggestedDifficulty: () => void;
+  dismissSuggestion:  () => void;
   toggleHeatmap:      () => void;
   castTimeSpell:      () => void;
   declineTimeSpell:   () => void;
@@ -193,6 +200,7 @@ interface LocalStoragePayload {
   dailyStreak?: number;
   dailyBestStreak?: number;
   lastDailyDate?: string | null;
+  aiRecord?: Record<string, ('w' | 'l' | 'd')[]>;
 }
 
 const saveToLocalStorage = (state: LocalStoragePayload) => {
@@ -209,6 +217,7 @@ const saveToLocalStorage = (state: LocalStoragePayload) => {
         dailyStreak: state.dailyStreak ?? 0,
         dailyBestStreak: state.dailyBestStreak ?? 0,
         lastDailyDate: state.lastDailyDate ?? null,
+        aiRecord: state.aiRecord ?? {},
       }));
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
@@ -276,6 +285,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   dailyStreak: 0,
   dailyBestStreak: 0,
   lastDailyDate: null,
+
+  aiRecord: { squire: [], knight: [], bishop: [], king: [] },
+  suggestedDifficulty: null,
 
   // ── Select / click square ──────────────────
   selectSquare: (square) => {
@@ -618,11 +630,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       }
 
+      // Adaptive Difficulty — record W/L on vs-AI games for the suggestion engine.
+      if (get().mode === 'vs-ai') {
+        const playerWon = move.color === playerColor;
+        get().recordAiResult(playerWon ? 'w' : 'l');
+      }
+
       set({ phase: 'gameover' });
     }
 
     if (chess.isDraw()) {
       setWizardMessage(pickWizardLine('draw') || '🤝 A valiant draw! Both armies fought with honour.', 'happy');
+      if (get().mode === 'vs-ai') {
+        get().recordAiResult('d');
+      }
       set({ phase: 'gameover' });
     }
 
@@ -727,6 +748,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       endgameMoveCount: 0,
       activeOpeningId: null,
       openingStep: 0,
+      suggestedDifficulty: null,
     });
   },
 
@@ -1102,6 +1124,47 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().newGame();
   },
 
+  // ── Adaptive Difficulty ──────────────────────
+  recordAiResult: (result) => {
+    set((state) => {
+      // Only record in vs-AI mode (not endgame/puzzle/opening).
+      if (state.mode !== 'vs-ai') return state;
+
+      const cur = state.aiRecord[state.difficulty] ?? [];
+      const updated = [...cur, result].slice(-5); // keep last 5
+
+      // Look at the last 3 results to compute a suggestion.
+      const last3 = updated.slice(-3);
+      const wins = last3.filter(r => r === 'w').length;
+      const losses = last3.filter(r => r === 'l').length;
+
+      const order: Difficulty[] = ['squire', 'knight', 'bishop', 'king'];
+      const idx = order.indexOf(state.difficulty);
+
+      let suggested: Difficulty | null = null;
+      if (last3.length === 3 && wins === 3 && idx < order.length - 1) {
+        suggested = order[idx + 1];
+      } else if (last3.length >= 2 && losses >= 2 && idx > 0) {
+        // Gentler trigger for step-down — kids need it sooner.
+        suggested = order[idx - 1];
+      }
+
+      const newAiRecord = { ...state.aiRecord, [state.difficulty]: updated };
+      const newState = { ...state, aiRecord: newAiRecord, suggestedDifficulty: suggested };
+      saveToLocalStorage(newState);
+      return { aiRecord: newAiRecord, suggestedDifficulty: suggested };
+    });
+  },
+
+  acceptSuggestedDifficulty: () => {
+    const { suggestedDifficulty } = get();
+    if (!suggestedDifficulty) return;
+    set({ difficulty: suggestedDifficulty, suggestedDifficulty: null });
+    get().newGame();
+  },
+
+  dismissSuggestion: () => set({ suggestedDifficulty: null }),
+
   usePuzzleHint: () => {
     const { activePuzzleId, puzzleHintsUsed } = get();
     if (!activePuzzleId) return;
@@ -1235,6 +1298,9 @@ export const useGameStore = create<GameState>((set, get) => ({
             dailyStreak: typeof parsed.dailyStreak === 'number' ? parsed.dailyStreak : state.dailyStreak,
             dailyBestStreak: typeof parsed.dailyBestStreak === 'number' ? parsed.dailyBestStreak : state.dailyBestStreak,
             lastDailyDate: parsed.lastDailyDate ?? state.lastDailyDate,
+            aiRecord: parsed.aiRecord
+              ? { ...state.aiRecord, ...parsed.aiRecord }
+              : state.aiRecord,
           };
         });
       }

@@ -43,6 +43,9 @@ export default function GamePage() {
     activeOpeningId,
     openingStep,
     exitOpeningMode,
+    suggestedDifficulty,
+    acceptSuggestedDifficulty,
+    dismissSuggestion,
   } = useGameStore();
 
   // ── Init sound system on first user interaction ──
@@ -304,6 +307,44 @@ export default function GamePage() {
                     : 'The Wizard wins this time. Keep practicing!')
                 : 'A hard-fought battle. Well played!'}
             </p>
+
+            {/* ── Adaptive Difficulty suggestion ─────────────── */}
+            {suggestedDifficulty && mode === 'vs-ai' && (() => {
+              const order = ['squire', 'knight', 'bishop', 'king'] as const;
+              const isStepUp = order.indexOf(suggestedDifficulty) > order.indexOf(difficulty);
+              const labels = {
+                squire: 'Squire', knight: 'Knight', bishop: 'Bishop', king: 'King',
+              };
+              return (
+                <div className={styles.suggestion} data-direction={isStepUp ? 'up' : 'down'}>
+                  <div className={styles.suggestionHead}>
+                    {isStepUp ? '⭐ Merlin senses your growing power!' : '🛡️ Merlin offers a kind word…'}
+                  </div>
+                  <p className={styles.suggestionText}>
+                    {isStepUp
+                      ? `You've crushed the ${labels[difficulty]} 3 times in a row. Ready to face the ${labels[suggestedDifficulty]}?`
+                      : `The ${labels[difficulty]} is tough today. Practice at ${labels[suggestedDifficulty]} level — you'll be back stronger!`}
+                  </p>
+                  <div className={styles.suggestionBtns}>
+                    <button
+                      id="btn-accept-suggestion"
+                      type="button"
+                      className={`btn btn-gold ${styles.suggestionAccept}`}
+                      onClick={acceptSuggestedDifficulty}
+                    >
+                      {isStepUp ? `⚔️ Face the ${labels[suggestedDifficulty]}` : `🛡️ Try ${labels[suggestedDifficulty]}`}
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-ghost ${styles.suggestionDismiss}`}
+                      onClick={dismissSuggestion}
+                    >
+                      No thanks
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             <div className={styles.gameOverBtns}>
               {chess.isCheckmate() && chess.turn() !== playerColor && (
                 <button

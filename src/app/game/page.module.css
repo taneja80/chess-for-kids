@@ -331,6 +331,72 @@
   letter-spacing: 0.04em;
 }
 
+/* ── Adaptive Difficulty suggestion ──────────── */
+.suggestion {
+  margin: 1rem 0 0.75rem;
+  padding: 1rem 1.25rem 1.1rem;
+  border-radius: 14px;
+  border: 1.5px solid;
+  text-align: center;
+  animation: suggestionRise 0.45s ease-out;
+}
+
+.suggestion[data-direction="up"] {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.08));
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 0 8px 28px rgba(251, 191, 36, 0.18);
+}
+
+.suggestion[data-direction="down"] {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(139, 92, 246, 0.08));
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 8px 28px rgba(56, 189, 248, 0.18);
+}
+
+@keyframes suggestionRise {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.suggestionHead {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.4rem;
+}
+
+.suggestion[data-direction="down"] .suggestionHead {
+  color: #7dd3fc;
+}
+
+.suggestionText {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.92rem;
+  color: rgba(226, 213, 248, 0.92);
+  line-height: 1.45;
+  margin: 0 0 0.8rem;
+}
+
+.suggestionBtns {
+  display: inline-flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.suggestionAccept {
+  font-size: 0.92rem !important;
+  padding: 0.5rem 1.1rem !important;
+}
+
+.suggestionDismiss {
+  font-size: 0.78rem !important;
+  padding: 0.42rem 0.9rem !important;
+  opacity: 0.78;
+}
+
 .exitDrillBtn {
   background: rgba(0, 0, 0, 0.25);
   color: #e2d5f8;
