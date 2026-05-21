@@ -23,6 +23,16 @@ interface WizardSkinItem {
   cost: number;
 }
 
+interface KnightAvatarItem {
+  id: string;
+  name: string;
+  emoji: string;
+  title: string;
+  color: string;
+  description: string;
+  cost: number;
+}
+
 const BOARD_THEMES: BoardThemeItem[] = [
   {
     id: 'classic',
@@ -97,6 +107,63 @@ const WIZARD_SKINS: WizardSkinItem[] = [
   },
 ];
 
+export const KNIGHT_AVATARS: KnightAvatarItem[] = [
+  {
+    id: 'squire',
+    name: 'Young Squire',
+    emoji: '🧑‍🎓',
+    title: 'Apprentice of the Court',
+    color: '#94a3b8',
+    description: 'Every grand master starts here. Eager, brave, and ready to learn.',
+    cost: 0,
+  },
+  {
+    id: 'knight_silver',
+    name: 'Sir Silverblade',
+    emoji: '🗡️',
+    title: 'Knight of the Silver Order',
+    color: '#cbd5e1',
+    description: 'A swift, honorable champion clad in moonlit armour.',
+    cost: 80,
+  },
+  {
+    id: 'knight_dragon',
+    name: 'Lady Dragonheart',
+    emoji: '🐉',
+    title: 'Rider of the Crimson Wyrm',
+    color: '#ef4444',
+    description: 'Tamer of dragons. Fearless in the face of any king.',
+    cost: 160,
+  },
+  {
+    id: 'knight_archer',
+    name: 'Robin the Swift',
+    emoji: '🏹',
+    title: 'Ranger of the Greenwood',
+    color: '#22c55e',
+    description: 'Master archer. Sees the whole board three moves ahead.',
+    cost: 140,
+  },
+  {
+    id: 'knight_paladin',
+    name: 'Sir Lightbringer',
+    emoji: '✨',
+    title: 'Paladin of the Golden Dawn',
+    color: '#fbbf24',
+    description: 'A radiant champion blessed by divine strategy.',
+    cost: 220,
+  },
+  {
+    id: 'knight_shadow',
+    name: 'The Shadow Knight',
+    emoji: '🎭',
+    title: 'Master of the Veiled Path',
+    color: '#7c3aed',
+    description: 'Strikes from places no one expected. Loved by tacticians.',
+    cost: 200,
+  },
+];
+
 export default function ArmouryShop() {
   const {
     goldCoins,
@@ -104,13 +171,17 @@ export default function ArmouryShop() {
     currentTheme,
     unlockedSkins,
     currentSkin,
+    unlockedAvatars,
+    currentAvatar,
     buyTheme,
     equipTheme,
     buySkin,
     equipSkin,
+    buyAvatar,
+    equipAvatar,
   } = useGameStore();
 
-  const [activeTab, setActiveTab] = useState<'boards' | 'wizards'>('boards');
+  const [activeTab, setActiveTab] = useState<'boards' | 'wizards' | 'avatars'>('boards');
   const [purchaseSparks, setPurchaseSparks] = useState<{ active: boolean; x: number; y: number }>({
     active: false,
     x: 0,
@@ -128,6 +199,14 @@ export default function ArmouryShop() {
   const handleBuySkin = (e: React.MouseEvent, id: string, cost: number) => {
     e.stopPropagation();
     const success = buySkin(id, cost);
+    if (success) {
+      triggerSparks(e.clientX, e.clientY);
+    }
+  };
+
+  const handleBuyAvatar = (e: React.MouseEvent, id: string, cost: number) => {
+    e.stopPropagation();
+    const success = buyAvatar(id, cost);
     if (success) {
       triggerSparks(e.clientX, e.clientY);
     }
@@ -170,6 +249,12 @@ export default function ArmouryShop() {
           onClick={() => setActiveTab('wizards')}
         >
           🧙‍♂️ Wizard Skins
+        </button>
+        <button
+          className={activeTab === 'avatars' ? styles.tabActive : styles.tabBtn}
+          onClick={() => setActiveTab('avatars')}
+        >
+          🤵 Knight Avatars
         </button>
       </div>
 
@@ -263,6 +348,58 @@ export default function ArmouryShop() {
                       onClick={(e) => handleBuySkin(e, skin.id, skin.cost)}
                     >
                       <span>🪙 {skin.cost} Gold</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Avatars Grid */}
+      {activeTab === 'avatars' && (
+        <div className={styles.grid}>
+          {KNIGHT_AVATARS.map((avatar) => {
+            const isUnlocked = unlockedAvatars.includes(avatar.id);
+            const isEquipped = currentAvatar === avatar.id;
+            const canAfford = goldCoins >= avatar.cost;
+
+            return (
+              <div
+                key={avatar.id}
+                className={[styles.card, isEquipped ? styles.cardEquipped : ''].join(' ')}
+                onClick={() => isUnlocked && equipAvatar(avatar.id)}
+              >
+                <div
+                  className={styles.wizardPreview}
+                  style={{
+                    boxShadow: `0 0 20px ${avatar.color}40`,
+                  }}
+                >
+                  <span className={styles.wizardEmoji}>{avatar.emoji}</span>
+                </div>
+
+                <div className={styles.cardDetails}>
+                  <h3 className={styles.cardName}>{avatar.name}</h3>
+                  <p className={styles.coachName} style={{ color: avatar.color }}>
+                    {avatar.title}
+                  </p>
+                  <p className={styles.cardDesc}>{avatar.description}</p>
+                </div>
+
+                <div className={styles.actionArea}>
+                  {isEquipped ? (
+                    <div className={styles.equippedBadge}>🛡️ Worn</div>
+                  ) : isUnlocked ? (
+                    <button className={styles.equipBtn}>Wear Avatar</button>
+                  ) : (
+                    <button
+                      className={[styles.buyBtn, !canAfford ? styles.btnDisabled : ''].join(' ')}
+                      disabled={!canAfford}
+                      onClick={(e) => handleBuyAvatar(e, avatar.id, avatar.cost)}
+                    >
+                      <span>🪙 {avatar.cost} Gold</span>
                     </button>
                   )}
                 </div>

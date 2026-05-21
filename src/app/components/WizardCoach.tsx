@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../../lib/gameStore';
+import { KNIGHT_AVATARS } from './ArmouryShop';
 import styles from './WizardCoach.module.css';
 
 const SKIN_CONFIGS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -12,7 +13,7 @@ const SKIN_CONFIGS: Record<string, { label: string; emoji: string; color: string
 };
 
 export default function WizardCoach() {
-  const { wizardMessage, wizardEmotion, resetWizard, currentSkin } = useGameStore();
+  const { wizardMessage, wizardEmotion, resetWizard, currentSkin, currentAvatar } = useGameStore();
   const [visible, setVisible] = useState(false);
   const [displayMsg, setDisplayMsg] = useState<string | null>(null);
 
@@ -37,6 +38,7 @@ export default function WizardCoach() {
   }, [wizardMessage, resetWizard]);
 
   const skin = SKIN_CONFIGS[currentSkin || 'classic'] || SKIN_CONFIGS.classic;
+  const avatar = KNIGHT_AVATARS.find(a => a.id === (currentAvatar || 'squire')) || KNIGHT_AVATARS[0];
 
   const getEmotionConfig = () => {
     switch (wizardEmotion) {
@@ -57,6 +59,16 @@ export default function WizardCoach() {
 
   return (
     <div className={styles.wizardContainer}>
+      {/* Player avatar header */}
+      <div className={styles.playerHeader} style={{ borderColor: avatar.color }}>
+        <span className={styles.playerEmoji}>{avatar.emoji}</span>
+        <div className={styles.playerInfo}>
+          <span className={styles.playerLabel}>You play as</span>
+          <span className={styles.playerName} style={{ color: avatar.color }}>{avatar.name}</span>
+        </div>
+      </div>
+
+      <div className={styles.coachRow}>
       {/* Wizard avatar - always visible */}
       <div className={styles.avatarWrapper}>
         <div
@@ -100,6 +112,7 @@ export default function WizardCoach() {
           <p>Tap a piece to see valid moves!</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

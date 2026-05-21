@@ -74,6 +74,8 @@ export interface GameState {
   currentTheme: string;
   unlockedSkins: string[];
   currentSkin: string;
+  unlockedAvatars: string[];
+  currentAvatar: string;
 
   // Puzzle progress
   puzzleProgress: Record<string, boolean>;
@@ -141,6 +143,8 @@ export interface GameState {
   equipTheme:         (themeId: string) => void;
   buySkin:            (skinId: string, cost: number) => boolean;
   equipSkin:          (skinId: string) => void;
+  buyAvatar:          (avatarId: string, cost: number) => boolean;
+  equipAvatar:        (avatarId: string) => void;
   startPuzzle:        (puzzleId: string) => void;
   resetActivePuzzle:  () => void;
   exitPuzzleMode:     () => void;
@@ -282,6 +286,8 @@ interface LocalStoragePayload {
   currentTheme: string;
   unlockedSkins: string[];
   currentSkin: string;
+  unlockedAvatars: string[];
+  currentAvatar: string;
   puzzleProgress: Record<string, boolean>;
   badges: Badge[];
   dailyStreak?: number;
@@ -299,6 +305,8 @@ const saveToLocalStorage = (state: LocalStoragePayload) => {
         currentTheme: state.currentTheme,
         unlockedSkins: state.unlockedSkins,
         currentSkin: state.currentSkin,
+        unlockedAvatars: state.unlockedAvatars,
+        currentAvatar: state.currentAvatar,
         puzzleProgress: state.puzzleProgress,
         badges: state.badges.map((b: Badge) => ({ id: b.id, earned: b.earned, earnedAt: b.earnedAt })),
         dailyStreak: state.dailyStreak ?? 0,
@@ -342,6 +350,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentTheme: 'classic',
   unlockedSkins: ['classic'],
   currentSkin: 'classic',
+  unlockedAvatars: ['squire'],
+  currentAvatar: 'squire',
 
   // Puzzle progress
   puzzleProgress: {},
@@ -1033,6 +1043,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  buyAvatar: (avatarId, cost) => {
+    const { goldCoins, unlockedAvatars } = get();
+    if (goldCoins < cost || unlockedAvatars.includes(avatarId)) {
+      return false;
+    }
+    set((state) => {
+      const newState = {
+        ...state,
+        goldCoins: state.goldCoins - cost,
+        unlockedAvatars: [...state.unlockedAvatars, avatarId],
+        currentAvatar: avatarId,
+      };
+      saveToLocalStorage(newState);
+      return newState;
+    });
+    get().setWizardMessage('🎉 New knight avatar unlocked! Suit up, brave warrior!', 'excited');
+    return true;
+  },
+
+  equipAvatar: (avatarId) => {
+    const { unlockedAvatars } = get();
+    if (!unlockedAvatars.includes(avatarId)) return;
+    set((state) => {
+      const newState = { ...state, currentAvatar: avatarId };
+      saveToLocalStorage(newState);
+      return newState;
+    });
+  },
+
   startPuzzle: (puzzleId) => {
     const puzzle = PUZZLES.find(p => p.id === puzzleId);
     if (!puzzle) return;
@@ -1335,6 +1374,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             currentTheme: parsed.currentTheme || state.currentTheme,
             unlockedSkins: parsed.unlockedSkins || state.unlockedSkins,
             currentSkin: parsed.currentSkin || state.currentSkin,
+            unlockedAvatars: parsed.unlockedAvatars || state.unlockedAvatars,
+            currentAvatar: parsed.currentAvatar || state.currentAvatar,
             puzzleProgress: parsed.puzzleProgress || state.puzzleProgress,
             badges: updatedBadges,
             dailyStreak: typeof parsed.dailyStreak === 'number' ? parsed.dailyStreak : state.dailyStreak,

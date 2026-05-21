@@ -1,13 +1,49 @@
 .wizardContainer {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.6rem;
   padding: 1rem;
   background: rgba(35, 22, 64, 0.6);
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 16px;
   position: relative;
   min-height: 90px;
+}
+
+.coachRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.playerHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  background: rgba(20, 12, 40, 0.6);
+  border: 1.5px solid rgba(148, 163, 184, 0.4);
+  border-radius: 12px;
+}
+.playerEmoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.playerInfo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.playerLabel {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.playerName {
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 /* ── Avatar ────────────────────────────── */

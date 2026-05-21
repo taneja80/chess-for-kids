@@ -15,6 +15,7 @@ import CapturedPieces from '../components/CapturedPieces';
 import PiecePromotion from '../components/PiecePromotion';
 import TimeSpellModal from '../components/TimeSpellModal';
 import ArmouryShop from '../components/ArmouryShop';
+import HallOfFame from '../components/HallOfFame';
 import QuestMap from '../components/QuestMap';
 import PuzzleControls from '../components/PuzzleControls';
 import EndgameTrainer from '../components/EndgameTrainer';
@@ -25,7 +26,7 @@ import styles from './page.module.css';
 export default function GamePage() {
   const router = useRouter();
   const stockfishReady = useRef(false);
-  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'openings' | 'armoury'>('arena');
+  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'openings' | 'armoury' | 'halloffame'>('arena');
   const [soundOn, setSoundOn] = useState(true);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
@@ -219,6 +220,12 @@ export default function GamePage() {
         >
           🪙 The Armoury
         </button>
+        <button
+          className={activeTab === 'halloffame' ? styles.tabNavActive : styles.tabNavBtn}
+          onClick={() => setActiveTab('halloffame')}
+        >
+          🏆 Hall of Fame
+        </button>
       </nav>
 
       {/* Main layout */}
@@ -234,6 +241,9 @@ export default function GamePage() {
         )}
         {activeTab === 'armoury' && (
           <ArmouryShop />
+        )}
+        {activeTab === 'halloffame' && (
+          <HallOfFame />
         )}
         {activeTab === 'arena' && (
           <>

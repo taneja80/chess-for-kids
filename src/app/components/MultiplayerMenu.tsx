@@ -36,9 +36,9 @@ export default function MultiplayerMenu() {
         <div className={styles.activeRoom}>
           <div className={styles.roomCodeBox}>
             <span className={styles.label}>Room Code</span>
-            <span className={styles.code}>{roomId}</span>
+            <span className={styles.code} data-testid="room-code">{roomId}</span>
           </div>
-          <button className={`btn btn-ghost ${styles.leaveBtn}`} onClick={leaveMultiplayerRoom}>
+          <button className={`btn btn-ghost ${styles.leaveBtn}`} onClick={leaveMultiplayerRoom} data-testid="leave-room-btn">
             Leave Game
           </button>
         </div>
@@ -51,7 +51,7 @@ export default function MultiplayerMenu() {
       <h3 className={styles.title}>🌐 Play with a Friend</h3>
       
       <div className={styles.actions}>
-        <button className={`btn btn-gold ${styles.createBtn}`} onClick={handleCreate}>
+        <button className={`btn btn-gold ${styles.createBtn}`} onClick={handleCreate} data-testid="create-room-btn">
           🪄 Create New Room
         </button>
         
@@ -67,11 +67,13 @@ export default function MultiplayerMenu() {
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             maxLength={6}
+            data-testid="join-code-input"
           />
           <button 
             type="submit" 
             className={`btn btn-primary ${styles.joinBtn}`}
             disabled={!joinCode.trim() || isJoining}
+            data-testid="join-room-btn"
           >
             {isJoining ? '...' : 'Join'}
           </button>
