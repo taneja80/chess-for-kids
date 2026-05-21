@@ -1,0 +1,194 @@
+'use client';
+
+import React, { useCallback, useMemo } from 'react';
+import { Square } from 'chess.js';
+import { useGameStore } from '../../lib/gameStore';
+import { calculateTerritory } from '../../lib/territory';
+import styles from './ChessBoard.module.css';
+
+// ──────────────────────────────────────────────
+// Chess Piece SVG Unicode renderer
+// ──────────────────────────────────────────────
+const PIECE_UNICODE: Record<string, string> = {
+  wk: '♚', wq: '♛', wr: '♜', wb: '♝', wn: '♞', wp: '♟',
+  bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
+};
+
+const PIECE_NAMES: Record<string, string> = {
+  k: 'King', q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight', p: 'Pawn',
+};
+
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
+
+// ──────────────────────────────────────────────
+// Component
+// ──────────────────────────────────────────────
+export default function ChessBoard() {
+  const {
+    chess,
+    selectedSquare,
+    validMoves,
+    lastMove,
+    playerColor,
+    aiThinking,
+    selectSquare,
+    currentTheme,
+    showHeatmap,
+  } = useGameStore();
+
+  // Flip board if playing as black
+  const displayRanks = playerColor === 'b' ? [...RANKS].reverse() : RANKS;
+  const displayFiles = playerColor === 'b' ? [...FILES].reverse() : FILES;
+
+  // Calculate territory control for all squares
+  const territory = useMemo(() => calculateTerritory(chess), [chess]);
+
+  const handleSquareClick = useCallback(
+    (square: Square) => {
+      if (aiThinking) return;
+      if (chess.turn() !== playerColor) return;
+      selectSquare(square);
+    },
+    [aiThinking, chess, playerColor, selectSquare]
+  );
+
+  return (
+    <div className={styles.boardWrapper} aria-label="Chess board" data-board-theme={currentTheme}>
+      {/* Rank labels (left) */}
+      <div className={styles.rankLabels}>
+        {displayRanks.map(rank => (
+          <span key={rank} className={styles.rankLabel}>{rank}</span>
+        ))}
+      </div>
+
+      <div className={styles.boardContainer}>
+        <div className={styles.board}>
+          {displayRanks.map((rank, ri) =>
+            displayFiles.map((file, fi) => {
+              const square = `${file}${rank}` as Square;
+              const isLight = (ri + fi) % 2 === 0;
+              const piece = chess.get(square);
+              const isSelected = selectedSquare === square;
+              const isValidMove = validMoves.includes(square);
+              const isLastMoveFrom = lastMove?.from === square;
+              const isLastMoveTo = lastMove?.to === square;
+              const isInCheck = chess.isCheck() && piece?.type === 'k' && piece?.color === chess.turn();
+
+              const squareClasses = [
+                styles.square,
+                isLight ? styles.light : styles.dark,
+                isSelected ? styles.selected : '',
+                isLastMoveFrom || isLastMoveTo ? styles.lastMove : '',
+                isInCheck ? styles.inCheck : '',
+              ].filter(Boolean).join(' ');
+
+              const pieceKey = piece ? `${piece.color}${piece.type}` : null;
+
+              // Compute control for heatmap
+              let controlClass = '';
+              const sqControl = territory[square];
+              if (sqControl) {
+                const friendlyControls = playerColor === 'w' ? sqControl.whiteControls : sqControl.blackControls;
+                const opponentControls = playerColor === 'w' ? sqControl.blackControls : sqControl.whiteControls;
+
+                if (friendlyControls > opponentControls) {
+                  controlClass = styles.controlFriendly;
+                } else if (opponentControls > friendlyControls) {
+                  controlClass = styles.controlOpponent;
+                } else if (friendlyControls > 0 && friendlyControls === opponentControls) {
+                  controlClass = styles.controlContested;
+                }
+              }
+
+              // Compute custom piece protection/threat aura
+              let hasShield = false;
+              let hasCrosshair = false;
+              if (piece && piece.color === playerColor) {
+                if (sqControl) {
+                  const friendlyControls = playerColor === 'w' ? sqControl.whiteControls : sqControl.blackControls;
+                  const opponentControls = playerColor === 'w' ? sqControl.blackControls : sqControl.whiteControls;
+                  
+                  if (friendlyControls > 0) {
+                    hasShield = true;
+                  } else if (opponentControls > 0 && friendlyControls === 0) {
+                    hasCrosshair = true;
+                  }
+                }
+              }
+
+              return (
+                <div
+                  key={square}
+                  id={`square-${square}`}
+                  className={squareClasses}
+                  onClick={() => handleSquareClick(square)}
+                  role="button"
+                  aria-label={`${square}${piece ? ` ${PIECE_NAMES[piece.type]} ${piece.color === 'w' ? 'white' : 'black'}` : ''}`}
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && handleSquareClick(square)}
+                >
+                  {/* Heatmap overlay */}
+                  {showHeatmap && controlClass && (
+                    <div className={`${styles.heatmapOverlay} ${controlClass}`} aria-hidden="true" />
+                  )}
+
+                  {/* Valid move indicator */}
+                  {isValidMove && (
+                    <div className={piece ? styles.captureRing : styles.validDot} />
+                  )}
+
+                  {/* Chess piece */}
+                  {pieceKey && (
+                    <span
+                      className={[
+                        styles.piece,
+                        piece?.color === 'w' ? styles.whitePiece : styles.blackPiece,
+                        isSelected ? styles.pieceSelected : '',
+                        aiThinking && piece?.color !== playerColor ? styles.pieceAi : '',
+                      ].filter(Boolean).join(' ')}
+                      aria-hidden="true"
+                    >
+                      {/* Shield or Crosshair visual overlay around the piece */}
+                      {hasShield && <div className={styles.pieceShield} />}
+                      {hasCrosshair && <div className={styles.pieceCrosshair} />}
+
+                      {PIECE_UNICODE[pieceKey]}
+                    </span>
+                  )}
+
+                  {/* Corner labels for a1 rank/file */}
+                  {fi === 0 && (
+                    <span className={styles.cornerRank}>{rank}</span>
+                  )}
+                  {ri === 7 && (
+                    <span className={styles.cornerFile}>{file}</span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* AI Thinking overlay */}
+        {aiThinking && (
+          <div className={styles.aiOverlay}>
+            <div className={styles.aiThinkingBubble}>
+              <span className={styles.aiSpinner}>🧙‍♂️</span>
+              <span>Wizard is thinking…</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* File labels (bottom) */}
+      <div className={styles.fileLabelsRow}>
+        <div className={styles.fileLabels}>
+          {displayFiles.map(file => (
+            <span key={file} className={styles.fileLabel}>{file}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

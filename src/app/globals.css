@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+/* =========================================================
+   CSS DESIGN TOKENS - MEDIEVAL THEME
+   ========================================================= */
+:root {
+  /* Colors */
+  --gold: #f5c518;
+  --gold-dark: #c9a227;
+  --gold-light: #fde06a;
+  --crimson: #8b1a1a;
+  --crimson-light: #c0392b;
+  --parchment: #f4e4b8;
+  --parchment-dark: #e8d49a;
+  --parchment-deeper: #c9a96e;
+  --stone: #3a3530;
+  --stone-light: #5c554a;
+  --stone-dark: #1a1714;
+  --forest: #2d5016;
+  --sky-blue: #4a90d9;
+
+  /* Board squares */
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
+  --sq-selected: rgba(255, 215, 0, 0.6);
+  --sq-valid: rgba(0, 200, 100, 0.45);
+  --sq-lastmove: rgba(255, 230, 0, 0.35);
+  --sq-check: rgba(200, 30, 30, 0.55);
+  --sq-highlight: rgba(100, 160, 255, 0.5);
+
+  /* Fonts */
+  --font-title: 'Cinzel', serif;
+  --font-body: 'Crimson Pro', serif;
+  --font-ui: 'Inter', sans-serif;
+
+  /* Borders & shadows */
+  --border-gold: 2px solid var(--gold-dark);
+  --shadow-gold: 0 0 20px rgba(245, 197, 24, 0.4);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-piece: 2px 4px 8px rgba(0,0,0,0.6);
+  --radius-card: 16px;
+  --radius-btn: 8px;
+}
+
+/* =========================================================
+   RESET & BASE
+   ========================================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--stone-dark);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-title);
+  color: var(--gold);
+  letter-spacing: 0.03em;
+}
+
+/* =========================================================
+   ANIMATED BACKGROUND
+   ========================================================= */
+.medieval-bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(139, 26, 26, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 90%, rgba(42, 80, 22, 0.2) 0%, transparent 50%),
+    linear-gradient(160deg, #1a1714 0%, #2a2520 40%, #1a1714 100%);
+  z-index: -1;
+}
+
+.medieval-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.5;
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius-btn);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  color: var(--stone-dark);
+  box-shadow: 0 4px 15px rgba(245, 197, 24, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(245, 197, 24, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--stone-light), var(--stone));
+  color: var(--parchment);
+  border: var(--border-gold);
+}
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #6b6258, var(--stone-light));
+  transform: translateY(-2px);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #6b1010, var(--crimson));
+  color: var(--parchment);
+  border: 2px solid #c0392b;
+}
+.btn-danger:hover { transform: translateY(-2px); filter: brightness(1.15); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--parchment);
+  border: 1px solid rgba(244, 228, 184, 0.3);
+}
+.btn-ghost:hover { background: rgba(244, 228, 184, 0.08); }
+
+.btn-sm { padding: 8px 16px; font-size: 0.85rem; }
+.btn-lg { padding: 16px 36px; font-size: 1.15rem; }
+.btn-full { width: 100%; }
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+.card {
+  background: linear-gradient(145deg, rgba(58, 53, 48, 0.9), rgba(26, 23, 20, 0.95));
+  border: 1px solid rgba(245, 197, 24, 0.25);
+  border-radius: var(--radius-card);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+.card-glow {
+  box-shadow: var(--shadow-card), 0 0 40px rgba(245, 197, 24, 0.15);
+}
+
+/* =========================================================
+   BADGE COMPONENT
+   ========================================================= */
+.badge-locked { opacity: 0.4; filter: grayscale(1); }
+.badge-unlocked { animation: badgePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+@keyframes badgePop {
+  0% { transform: scale(0.6); opacity: 0; }
+  80% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* =========================================================
+   GOLD COIN COUNTER
+   ========================================================= */
+.coin-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(197, 162, 39, 0.2), rgba(245, 197, 24, 0.1));
+  border: 1px solid rgba(245, 197, 24, 0.4);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-title);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* =========================================================
+   COACH BUBBLE
+   ========================================================= */
+.coach-bubble {
+  background: linear-gradient(135deg, rgba(42, 80, 22, 0.9), rgba(26, 50, 10, 0.95));
+  border: 2px solid rgba(100, 200, 80, 0.4);
+  border-radius: 16px 16px 16px 4px;
+  padding: 16px 20px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: #c8f0a0;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--stone-dark); }
+::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 3px; }
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(245,197,24,0.4); }
+  50% { box-shadow: 0 0 24px rgba(245,197,24,0.8); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+
+/* =========================================================
+   MODAL OVERLAY
+   ========================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* =========================================================
+   LEVEL PROGRESS BAR
+   ========================================================= */
+.xp-bar {
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+  border-radius: 999px;
+  transition: width 0.5s ease-out;
+}
+
+/* =========================================================
+   RESPONSIVE UTILITIES
+   ========================================================= */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
+.w-full { width: 100%; }
+.text-center { text-align: center; }
+
+/* =========================================================
+   PIECE DRAG
+   ========================================================= */
+.piece-dragging {
+  cursor: grabbing !important;
+  filter: drop-shadow(0 8px 16px rgba(0,0,0,0.8));
+  transform: scale(1.15);
+  z-index: 999;
+}

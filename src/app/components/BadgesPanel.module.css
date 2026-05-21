@@ -1,0 +1,138 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(35, 22, 64, 0.6);
+  border: 1px solid rgba(74, 50, 120, 0.6);
+  border-radius: 16px;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e2d5f8;
+  margin: 0;
+}
+
+.count {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.75rem;
+  color: rgba(245, 158, 11, 0.9);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+}
+
+.progressBar {
+  height: 5px;
+  background: rgba(74, 50, 120, 0.5);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #f59e0b);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+/* ── Grid ────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: default;
+}
+
+.badge:hover {
+  transform: translateY(-2px);
+}
+
+.badgeEarned {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+  animation: popIn 0.4s ease-out;
+}
+
+.badgeLocked {
+  background: rgba(26, 15, 46, 0.5);
+  border-color: rgba(74, 50, 120, 0.3);
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+.badgeIcon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.badgeName {
+  font-size: 0.58rem;
+  font-weight: 700;
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  color: rgba(226, 213, 248, 0.85);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.earnedGlow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(245,158,11,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+@keyframes popIn {
+  0%   { transform: scale(0.7); opacity: 0; }
+  70%  { transform: scale(1.05); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+.expandBtn {
+  background: none;
+  border: 1px solid rgba(74, 50, 120, 0.4);
+  color: rgba(167, 139, 250, 0.7);
+  font-size: 0.72rem;
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  align-self: center;
+}
+.expandBtn:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.5);
+}

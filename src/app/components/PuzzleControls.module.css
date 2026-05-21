@@ -1,0 +1,244 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: rgba(35, 22, 64, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 16px;
+  padding: 1.25rem;
+  width: 100%;
+}
+
+.noActive {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.9rem;
+  color: rgba(167, 139, 250, 0.6);
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* ── Header ──────────────────────────────── */
+.header {
+  text-align: center;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  padding-bottom: 0.75rem;
+}
+
+.category {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(167, 139, 250, 0.6);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e2d5f8;
+  margin: 0.2rem 0;
+  line-height: 1.3;
+}
+
+.difficulty {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Details Panel ───────────────────────── */
+.questDetails {
+  background: rgba(26, 15, 46, 0.5);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+
+.desc {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: rgba(226, 213, 248, 0.8);
+  margin: 0 0 0.75rem 0;
+}
+
+.goldBounty {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 8px;
+  padding: 0.4rem 0;
+}
+
+/* ── Hints Section ───────────────────────── */
+.hintsSection {
+  background: rgba(26, 15, 46, 0.8);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #c4b5fd;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.noHints {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.75rem;
+  color: rgba(226, 213, 248, 0.5);
+  font-style: italic;
+  margin: 0 0 0.75rem 0;
+}
+
+.hintsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.hintItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  background: rgba(139, 92, 246, 0.08);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 0 8px 8px 0;
+  padding: 0.5rem;
+  animation: slideIn 0.25s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(8px); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+
+.hintBullet {
+  font-size: 0.8rem;
+  color: #fbbf24;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hintText {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgba(226, 213, 248, 0.85);
+  margin: 0;
+  font-style: italic;
+}
+
+.unlockHintBtn {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #e2d5f8;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 8px;
+  padding: 0.45rem 0;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.unlockHintBtn:hover {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+.controlsActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Victory Card ────────────────────────── */
+.victoryCard {
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.15) 0%, rgba(35, 22, 64, 0.9) 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 14px;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  box-shadow: 0 0 25px rgba(251, 191, 36, 0.2);
+  animation: bounceCard 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bounceCard {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.victoryEmoji {
+  font-size: 3rem;
+  line-height: 1;
+  animation: floatEmoji 2.5s ease-in-out infinite;
+}
+
+@keyframes floatEmoji {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+
+.victoryTitle {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin: 0.4rem 0 0.2rem 0;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+
+.victoryDesc {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.8rem;
+  color: rgba(226, 213, 248, 0.8);
+  margin: 0 0 0.75rem 0;
+}
+
+.rewardBadge {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 8px;
+  padding: 0.35rem 0;
+  margin-bottom: 1.25rem;
+}
+
+.victoryActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.finalVictory {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}

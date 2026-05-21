@@ -1,0 +1,147 @@
+.wizardContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(35, 22, 64, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 16px;
+  position: relative;
+  min-height: 90px;
+}
+
+/* ── Avatar ────────────────────────────── */
+.avatarWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(45, 31, 82, 0.9);
+  border: 2px solid rgba(139, 92, 246, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: float 3s ease-in-out infinite;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.avatarActive {
+  border-color: var(--wizard-color, #a78bfa);
+  box-shadow: 0 0 16px var(--wizard-color, #a78bfa);
+  animation: float 3s ease-in-out infinite, pulseGlow 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+
+@keyframes pulseGlow {
+  from { box-shadow: 0 0 8px var(--wizard-color, #a78bfa); }
+  to   { box-shadow: 0 0 20px var(--wizard-color, #a78bfa), 0 0 35px var(--wizard-color, #a78bfa); }
+}
+
+.avatarEmoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.emotionBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 1rem;
+  animation: popIn 0.3s ease-out;
+}
+
+@keyframes popIn {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+.wizardName {
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: 0.6rem;
+  color: rgba(167, 139, 250, 0.8);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Speech bubble ─────────────────────── */
+.bubble {
+  flex: 1;
+  background: rgba(26, 15, 46, 0.95);
+  border: 2px solid rgba(139, 92, 246, 0.6);
+  border-radius: 12px;
+  padding: 0.75rem 2rem 0.75rem 0.75rem;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.bubbleArrow {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 10px solid rgba(139, 92, 246, 0.6);
+}
+
+.bubbleIn {
+  animation: slideInLeft 0.25s ease-out;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-12px); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+}
+
+.bubbleText {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2d5f8;
+  line-height: 1.5;
+}
+
+.dismissBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: rgba(226, 213, 248, 0.5);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+.dismissBtn:hover {
+  color: #e2d5f8;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Idle hint ──────────────────────────── */
+.idleHint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.idleHint p {
+  font-family: var(--font-body, 'Nunito', sans-serif);
+  font-size: 0.8rem;
+  color: rgba(167, 139, 250, 0.6);
+  font-style: italic;
+}
