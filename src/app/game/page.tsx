@@ -58,6 +58,16 @@ export default function GamePage() {
     return () => window.removeEventListener('pointerdown', handler);
   }, []);
 
+  // ── Tear down any multiplayer subscription on unmount ──
+  // Prevents the Firebase RTDB listener (and the Chess instance bound to
+  // the previous room) from outliving navigation away from /game.
+  useEffect(() => {
+    return () => {
+      const s = useGameStore.getState();
+      if (s.isMultiplayer) s.leaveMultiplayerRoom();
+    };
+  }, []);
+
   const handleToggleSound = useCallback(() => {
     const next = !soundOn;
     setSoundOn(next);

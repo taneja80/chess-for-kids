@@ -186,6 +186,93 @@ const INITIAL_BADGES: Badge[] = [
 // Module-level handle for the active multiplayer subscription so we can clean it up on leave.
 let multiplayerUnsubscribe: (() => void) | null = null;
 
+const detachMultiplayerListener = () => {
+  if (multiplayerUnsubscribe) {
+    multiplayerUnsubscribe();
+    multiplayerUnsubscribe = null;
+  }
+};
+
+// Shape of a snapshot written to Firebase RTDB by `makeMove`.
+interface RemoteGameSnapshot {
+  fen?: string;
+  lastMove?: { from: string; to: string; promotion?: string };
+  lastSan?: string;
+  lastCaptured?: string | null;
+  turn?: 'w' | 'b';
+  timestamp?: number;
+  status?: string;
+}
+
+// Apply an incoming RTDB snapshot to local state. Replays the opponent's
+// move on the existing Chess instance via SAN/coords so moveHistory,
+// history, and capturedPieces all stay in sync. Falls back to a hard FEN
+// reset (dropping derived history) only if the move can't be replayed
+// cleanly (e.g. fresh join into a mid-game room).
+const applyRemoteSnapshot = (
+  data: RemoteGameSnapshot | null,
+  getState: () => GameState,
+  setState: (partial: Partial<GameState>) => void,
+) => {
+  if (!data || !data.fen) return;
+  const state = getState();
+  if (data.fen === state.fen) return; // echo of our own write
+
+  const chess = state.chess;
+  let appliedMove: Move | null = null;
+  try {
+    if (data.lastSan) {
+      appliedMove = chess.move(data.lastSan);
+    } else if (data.lastMove?.from && data.lastMove?.to) {
+      appliedMove = chess.move({
+        from: data.lastMove.from,
+        to: data.lastMove.to,
+        promotion: data.lastMove.promotion || 'q',
+      });
+    }
+  } catch {
+    appliedMove = null;
+  }
+
+  if (appliedMove && chess.fen() === data.fen) {
+    const captured = {
+      w: [...state.capturedPieces.w],
+      b: [...state.capturedPieces.b],
+    };
+    if (appliedMove.captured) {
+      captured[appliedMove.color].push(appliedMove.captured);
+    }
+    setState({
+      fen: data.fen,
+      chess,
+      lastMove: {
+        from: appliedMove.from as Square,
+        to: appliedMove.to as Square,
+      },
+      history: [...state.history, data.fen],
+      moveHistory: [...state.moveHistory, appliedMove],
+      capturedPieces: captured,
+      selectedSquare: null,
+      validMoves: [],
+    });
+  } else {
+    // Hard resync — rebuild from FEN. We lose derived moveHistory rather
+    // than risk showing a corrupt board.
+    const fresh = new Chess(data.fen);
+    setState({
+      fen: data.fen,
+      chess: fresh,
+      lastMove: data.lastMove
+        ? { from: data.lastMove.from as Square, to: data.lastMove.to as Square }
+        : null,
+      history: [data.fen],
+      moveHistory: [],
+      selectedSquare: null,
+      validMoves: [],
+    });
+  }
+};
+
 // ──────────────────────────────────────────────
 // Store
 // ──────────────────────────────────────────────
@@ -544,7 +631,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const gameRef = ref(rtdb, `games/${roomId}`);
       updateDb(gameRef, {
         fen: newFen,
-        lastMove: { from, to },
+        lastMove: { from, to, promotion: promotion || null },
         lastSan: move.san,
         lastCaptured: move.captured || null,
         turn: chess.turn(),
@@ -717,6 +804,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // ── New game ──────────────────────────────
   newGame: () => {
+    // Drop any active multiplayer subscription so it doesn't leak into the
+    // new local game (e.g. when clicking "Play Again" from a multiplayer room).
+    detachMultiplayerListener();
     const chess = new Chess();
     set({
       chess,
@@ -790,10 +880,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Multiplayer Logic ────────────────────────
   createMultiplayerRoom: async () => {
     // Clean up any prior subscription before creating a new room
-    if (multiplayerUnsubscribe) {
-      multiplayerUnsubscribe();
-      multiplayerUnsubscribe = null;
-    }
+    detachMultiplayerListener();
 
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const chess = new Chess();
@@ -824,27 +911,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Listen for opponent moves and sync history + captured pieces locally.
     onValue(gameRef, (snapshot) => {
-      const data = snapshot.val();
-      const state = get();
-      if (data && data.fen && data.fen !== state.fen) {
-        const newChess = new Chess(data.fen);
-        const newHistory = [...state.history, data.fen];
-        const newCaptured = { w: [...state.capturedPieces.w], b: [...state.capturedPieces.b] };
-        if (data.lastCaptured) {
-          // After the move, `newChess.turn()` is the side to move NEXT, so the capturer is the opposite color.
-          const capColor: PlayerColor = newChess.turn() === 'w' ? 'b' : 'w';
-          newCaptured[capColor].push(data.lastCaptured);
-        }
-        set({
-          fen: data.fen,
-          chess: newChess,
-          history: newHistory,
-          lastMove: data.lastMove || null,
-          capturedPieces: newCaptured,
-          selectedSquare: null,
-          validMoves: [],
-        });
-      }
+      applyRemoteSnapshot(snapshot.val() as RemoteGameSnapshot | null, get, (partial) => set(partial));
     });
     multiplayerUnsubscribe = () => {
       off(gameRef);
@@ -854,10 +921,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   joinMultiplayerRoom: async (roomId: string) => {
-    if (multiplayerUnsubscribe) {
-      multiplayerUnsubscribe();
-      multiplayerUnsubscribe = null;
-    }
+    detachMultiplayerListener();
 
     roomId = roomId.toUpperCase();
     const gameRef = ref(rtdb, `games/${roomId}`);
@@ -892,26 +956,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Listen for moves
     onValue(gameRef, (snapshot) => {
-      const data = snapshot.val();
-      const state = get();
-      if (data && data.fen && data.fen !== state.fen) {
-        const chessRemote = new Chess(data.fen);
-        const newHistory = [...state.history, data.fen];
-        const newCaptured = { w: [...state.capturedPieces.w], b: [...state.capturedPieces.b] };
-        if (data.lastCaptured) {
-          const capColor: PlayerColor = chessRemote.turn() === 'w' ? 'b' : 'w';
-          newCaptured[capColor].push(data.lastCaptured);
-        }
-        set({
-          fen: data.fen,
-          chess: chessRemote,
-          history: newHistory,
-          lastMove: data.lastMove || null,
-          capturedPieces: newCaptured,
-          selectedSquare: null,
-          validMoves: [],
-        });
-      }
+      applyRemoteSnapshot(snapshot.val() as RemoteGameSnapshot | null, get, (partial) => set(partial));
     });
     multiplayerUnsubscribe = () => {
       off(gameRef);
@@ -921,10 +966,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   leaveMultiplayerRoom: () => {
-    if (multiplayerUnsubscribe) {
-      multiplayerUnsubscribe();
-      multiplayerUnsubscribe = null;
-    }
+    detachMultiplayerListener();
     set({
       isMultiplayer: false,
       roomId: null,
