@@ -50,6 +50,8 @@
   grid-template-rows: repeat(8, 1fr);
   width: min(72vmin, 540px);
   height: min(72vmin, 540px);
+  /* Prevent the browser from interpreting drags as page-scroll / pinch-zoom */
+  touch-action: none;
 }
 
 /* ── Squares ─────────────────────────────────── */
@@ -62,6 +64,11 @@
   transition: background-color 0.12s ease;
   /* Overflow visible so the move-quality badge (translateY out of the square) is not clipped. */
   overflow: visible;
+  /* Make squares feel native on touch devices */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .square:focus {
   outline: 2px solid rgba(139, 92, 246, 0.8);
@@ -408,3 +415,17 @@
   to   { transform: rotate(360deg); }
 }
 
+
+/* ──────────────────────────────────────────────
+   📱 Mobile: fit board in viewport, tighter labels
+   ────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .board {
+    width: min(94vw, 540px);
+    height: min(94vw, 540px);
+  }
+  .rankLabels { left: -1.2rem; bottom: 1.2rem; }
+  .rankLabel { font-size: 0.6rem; width: 0.9rem; }
+  .fileLabels { gap: 0; }
+  .fileLabel { font-size: 0.6rem; }
+}

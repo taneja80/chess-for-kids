@@ -257,7 +257,15 @@
   border-bottom: 1px solid rgba(74, 50, 120, 0.4);
   padding: 0.6rem;
   z-index: 40;
+  /* Horizontal scroll on small screens so all 7 tabs are reachable */
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
+.tabNavbar::-webkit-scrollbar { height: 4px; }
+.tabNavbar::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.35); border-radius: 2px; }
 
 .tabNavBtn, .tabNavActive {
   font-family: var(--font-display, 'Cinzel', serif);
@@ -272,6 +280,9 @@
   transition: all 0.2s ease;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  scroll-snap-align: center;
 }
 
 .tabNavBtn:hover {
@@ -416,3 +427,28 @@
   border-color: rgba(167, 139, 250, 0.7);
 }
 
+
+/* ──────────────────────────────────────────────
+   📱 Mobile breakpoints (small phones)
+   ────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .header { padding: 0.5rem 0.75rem; gap: 0.5rem; }
+  .backBtn { padding: 0.3rem 0.55rem !important; font-size: 0.7rem !important; }
+  .headerText { font-size: 0.85rem; }
+  .moveCount { padding: 0.15rem 0.45rem; }
+  .moveLabel { font-size: 0.5rem; }
+  .moveNum { font-size: 0.85rem; }
+  .soundBtn { width: 32px; height: 32px; font-size: 0.85rem; }
+
+  .tabNavbar { gap: 0.4rem; padding: 0.4rem 0.5rem; justify-content: flex-start; }
+  .tabNavBtn, .tabNavActive { font-size: 0.7rem; padding: 0.35rem 0.7rem; }
+
+  .main { padding: 0.5rem; gap: 0.75rem; }
+  .boardArea { padding: 0; gap: 0.5rem; width: 100%; }
+  .leftPanel, .rightPanel { gap: 0.5rem; }
+
+  .gameOverModal { padding: 1.5rem 1.1rem; border-radius: 18px; }
+  .gameOverTitle { font-size: 1.4rem; }
+  .gameOverEmoji { font-size: 2.8rem; }
+  .gameOverBtns { flex-wrap: wrap; justify-content: center; }
+}

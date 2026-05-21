@@ -136,3 +136,7 @@
   color: #a78bfa;
   border-color: rgba(139, 92, 246, 0.5);
 }
+
+@media (max-width: 600px) {
+  .panel { padding: 0.6rem; }
+}

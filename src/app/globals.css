@@ -55,6 +55,17 @@ html, body {
   font-size: 16px;
   line-height: 1.5;
   overflow-x: hidden;
+  /* Respect notched / rounded phones */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* Avoid iOS auto-zoom on input focus and improve tap responsiveness */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Interactive elements: fast taps, no callout / highlight on touch */
+button, a, [role="button"], input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1, h2, h3, h4 {

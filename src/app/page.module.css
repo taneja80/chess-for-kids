@@ -417,3 +417,36 @@
   font-size: 0.8rem;
   color: rgba(167, 139, 250, 0.4);
 }
+
+/* ──────────────────────────────────────────────
+   📱 Mobile breakpoints
+   ────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .hero { padding: 2.5rem 1rem 3rem; min-height: auto; }
+  .heroContent { gap: 1.25rem; }
+  .heroSubtitle { max-width: 100%; padding: 0 0.25rem; }
+  .heroBtn { font-size: 1rem !important; padding: 0.65rem 1.4rem !important; }
+  .pieceShowcase { gap: 0.4rem; }
+  .pieceCard { min-width: 56px; padding: 0.5rem 0.4rem; }
+  .pieceSymbol { font-size: 1.7rem; }
+  .pieceName { font-size: 0.55rem; }
+
+  .features { padding: 2.5rem 1rem; }
+  .featuresGrid { grid-template-columns: 1fr; gap: 0.9rem; }
+  .featureCard { padding: 1.1rem 1rem; }
+
+  .howTo { padding: 2.5rem 1rem; }
+  .steps { gap: 1.25rem; }
+  .step { max-width: 100%; }
+
+  .finalCta { padding: 2.5rem 1rem; }
+  .finalCtaCard { padding: 1.75rem 1.25rem; }
+  .finalCtaBtn { font-size: 1rem !important; padding: 0.75rem 1.5rem !important; }
+
+  .footer { padding: 1rem; font-size: 0.7rem; }
+}
+
+@media (max-width: 420px) {
+  .heroCta { flex-direction: column; width: 100%; }
+  .heroCta > * { width: 100%; }
+}

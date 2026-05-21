@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
@@ -6,6 +6,14 @@ export const metadata: Metadata = {
   title: "Chess Kingdom - Learn Chess the Medieval Way!",
   description:
     "An educational chess game for kids featuring a Medieval Knights theme. Learn the rules, solve puzzles, and challenge the AI or your friends!",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#1a1714",
 };
 
 export default function RootLayout({
