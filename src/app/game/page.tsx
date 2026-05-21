@@ -18,13 +18,14 @@ import ArmouryShop from '../components/ArmouryShop';
 import QuestMap from '../components/QuestMap';
 import PuzzleControls from '../components/PuzzleControls';
 import EndgameTrainer from '../components/EndgameTrainer';
+import OpeningTrainer from '../components/OpeningTrainer';
 import CoachReplay from '../components/CoachReplay';
 import styles from './page.module.css';
 
 export default function GamePage() {
   const router = useRouter();
   const stockfishReady = useRef(false);
-  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'armoury'>('arena');
+  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'openings' | 'armoury'>('arena');
   const [soundOn, setSoundOn] = useState(true);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
@@ -39,6 +40,9 @@ export default function GamePage() {
     pendingTimeSpell,
     activeEndgameId,
     exitEndgameMode,
+    activeOpeningId,
+    openingStep,
+    exitOpeningMode,
   } = useGameStore();
 
   // ── Init sound system on first user interaction ──
@@ -122,6 +126,7 @@ export default function GamePage() {
   }, [chess, playerColor, difficulty, setAiThinking, makeMove, setWizardMessage]);
 
   // Watch for turn changes to trigger AI (vs-ai and endgame drills both use AI).
+  // Opening mode plays scripted book moves directly inside `makeMove` so no AI here.
   useEffect(() => {
     if (phase !== 'playing') return;
     if (mode !== 'vs-ai' && mode !== 'endgame') return;
@@ -190,6 +195,12 @@ export default function GamePage() {
           🛡️ Endgame Trainer
         </button>
         <button
+          className={activeTab === 'openings' ? styles.tabNavActive : styles.tabNavBtn}
+          onClick={() => setActiveTab('openings')}
+        >
+          📚 Openings
+        </button>
+        <button
           className={activeTab === 'armoury' ? styles.tabNavActive : styles.tabNavBtn}
           onClick={() => setActiveTab('armoury')}
         >
@@ -204,6 +215,9 @@ export default function GamePage() {
         )}
         {activeTab === 'endgame' && (
           <EndgameTrainer onEnterDrill={() => setActiveTab('arena')} />
+        )}
+        {activeTab === 'openings' && (
+          <OpeningTrainer onEnterOpening={() => setActiveTab('arena')} />
         )}
         {activeTab === 'armoury' && (
           <ArmouryShop />
@@ -233,6 +247,18 @@ export default function GamePage() {
                     onClick={() => { exitEndgameMode(); setActiveTab('endgame'); }}
                   >
                     Exit Drill
+                  </button>
+                </div>
+              )}
+              {mode === 'opening' && activeOpeningId && (
+                <div className={styles.openingIndicator}>
+                  📚 Opening Lesson — Step {openingStep + 1}: Play the suggested move!
+                  <button
+                    type="button"
+                    className={styles.exitDrillBtn}
+                    onClick={() => { exitOpeningMode(); setActiveTab('openings'); }}
+                  >
+                    Exit Lesson
                   </button>
                 </div>
               )}

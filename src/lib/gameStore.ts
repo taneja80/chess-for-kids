@@ -7,6 +7,8 @@ import { rtdb } from './firebase';
 import { ref, set as setDb, onValue, get as getDb, update as updateDb, off } from 'firebase/database';
 import { PUZZLES } from './gameData';
 import { ENDGAME_DRILLS, EndgameDrill } from './endgameDrills';
+import { OPENINGS } from './openings';
+import { pickWizardLine } from './wizardVoice';
 import { calculateTerritory } from './territory';
 import { classifyMove, MoveQuality } from './moveQuality';
 import { detectMotif, Motif } from './motifs';
@@ -27,7 +29,7 @@ export interface Badge {
 }
 
 export type GamePhase = 'home' | 'tutorial' | 'playing' | 'gameover';
-export type GameMode  = 'vs-ai' | 'vs-friend' | 'puzzle' | 'endgame';
+export type GameMode  = 'vs-ai' | 'vs-friend' | 'puzzle' | 'endgame' | 'opening';
 export type PlayerColor = 'w' | 'b';
 
 export interface CapturedPieces {
@@ -105,6 +107,10 @@ export interface GameState {
   activeEndgameId: string | null;
   endgameMoveCount: number; // tracks moves played in current drill
 
+  // Opening Trainer mode
+  activeOpeningId: string | null;
+  openingStep: number;
+
   // Daily Quest tracking
   dailyStreak: number;
   dailyBestStreak: number;
@@ -137,6 +143,8 @@ export interface GameState {
   usePuzzleHint:      () => void;
   startEndgame:       (endgameId: string) => void;
   exitEndgameMode:    () => void;
+  startOpening:       (openingId: string) => void;
+  exitOpeningMode:    () => void;
   toggleHeatmap:      () => void;
   castTimeSpell:      () => void;
   declineTimeSpell:   () => void;
@@ -262,6 +270,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeEndgameId: null,
   endgameMoveCount: 0,
 
+  activeOpeningId: null,
+  openingStep: 0,
+
   dailyStreak: 0,
   dailyBestStreak: 0,
   lastDailyDate: null,
@@ -304,6 +315,33 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Make a move ────────────────────────────
   makeMove: (from, to, promotion) => {
     const { chess, history, moveHistory, playerColor, difficulty } = get();
+
+    // ─── Opening Trainer interception ──────────────────────────────
+    // Validate the player's intended move against the canonical book move BEFORE applying.
+    if (get().mode === 'opening' && get().activeOpeningId) {
+      const opening = OPENINGS.find(o => o.id === get().activeOpeningId);
+      if (opening) {
+        const step = opening.steps[get().openingStep];
+        // Only validate when it's the player's turn in the script.
+        if (step && step.color === chess.turn() && step.color === playerColor) {
+          let expectedMove: Move | null = null;
+          try {
+            const tempChess = new Chess(chess.fen());
+            expectedMove = tempChess.move(step.san);
+          } catch {
+            expectedMove = null;
+          }
+          if (expectedMove && (expectedMove.from !== from || expectedMove.to !== to)) {
+            // Wrong move — coach the player and refuse to apply.
+            get().setWizardMessage(
+              `✋ Not quite! In the ${opening.name}, the book move here is ${step.san.toUpperCase()}. Try again!`,
+              'warning'
+            );
+            return false;
+          }
+        }
+      }
+    }
 
     // Snapshot the position BEFORE the move so we can detect tactical motifs.
     const fenBefore = chess.fen();
@@ -383,6 +421,53 @@ export const useGameStore = create<GameState>((set, get) => ({
       playCapture();
     } else {
       playMove();
+    }
+
+    // ── Opening Trainer post-move handling ──────────────────────────────
+    if (get().mode === 'opening' && get().activeOpeningId) {
+      const opening = OPENINGS.find(o => o.id === get().activeOpeningId);
+      if (opening) {
+        const stepIdx = get().openingStep;
+        const justPlayed = opening.steps[stepIdx];
+        if (justPlayed && justPlayed.color === move.color) {
+          // Show this move's commentary.
+          get().setWizardMessage(
+            `${justPlayed.icon || '📖'} ${justPlayed.commentary}`,
+            move.color === playerColor ? 'happy' : 'idle'
+          );
+          const nextIdx = stepIdx + 1;
+          set({ openingStep: nextIdx });
+
+          const nextStep = opening.steps[nextIdx];
+          if (!nextStep) {
+            // Opening complete — reward the player.
+            get().addCoins(opening.reward);
+            setTimeout(() => {
+              get().setWizardMessage(
+                `🎓 ${opening.name} mastered! +${opening.reward} gold. Try another opening to grow your repertoire!`,
+                'excited'
+              );
+            }, 1400);
+          } else if (nextStep.color !== playerColor) {
+            // Auto-play the opponent's book reply after a short pause.
+            setTimeout(() => {
+              const cur = get();
+              if (cur.mode !== 'opening' || cur.activeOpeningId !== opening.id) return;
+              let bookMove: Move | null = null;
+              try {
+                const tmp = new Chess(cur.chess.fen());
+                bookMove = tmp.move(nextStep.san);
+              } catch {
+                bookMove = null;
+              }
+              if (bookMove) {
+                cur.makeMove(bookMove.from as Square, bookMove.to as Square, bookMove.promotion);
+              }
+            }, 1200);
+          }
+        }
+      }
+      return true; // skip the rest of makeMove flow (no badges/endgame/etc. while training)
     }
 
     // Intercept Puzzle Mode moves
@@ -465,28 +550,29 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (move.captured && !badges.find(b => b.id === 'first_capture')?.earned) {
       earnBadge('first_capture');
       addCoins(10);
+      setWizardMessage(pickWizardLine('first_capture') || '⚔️ First blood! You captured your first piece!', 'excited');
     }
     if (move.captured === 'q' && !badges.find(b => b.id === 'queen_capture')?.earned) {
       earnBadge('queen_capture');
       addCoins(50);
-      setWizardMessage('🐉 You slew the Dragon Queen! LEGENDARY move!', 'excited');
+      setWizardMessage(pickWizardLine('queen_capture') || '🐉 You slew the Dragon Queen! LEGENDARY move!', 'excited');
     }
     if (move.flags.includes('k') || move.flags.includes('q')) {
       if (!badges.find(b => b.id === 'first_castle')?.earned) {
         earnBadge('first_castle');
         addCoins(15);
-        setWizardMessage('🏰 Brilliant! Your castle walls grow stronger!', 'excited');
+        setWizardMessage(pickWizardLine('first_castle') || '🏰 Brilliant! Your castle walls grow stronger!', 'excited');
       }
     }
     if (chess.isCheck() && !badges.find(b => b.id === 'first_check')?.earned) {
       earnBadge('first_check');
       addCoins(20);
-      setWizardMessage('👑 The enemy King trembles before you!', 'excited');
+      setWizardMessage(pickWizardLine('first_check') || '👑 The enemy King trembles before you!', 'excited');
     }
     if (move.flags.includes('p') && !badges.find(b => b.id === 'pawn_promote')?.earned) {
       earnBadge('pawn_promote');
       addCoins(30);
-      setWizardMessage('✨ Your brave pawn ascends to royalty!', 'excited');
+      setWizardMessage(pickWizardLine('pawn_promote') || '✨ Your brave pawn ascends to royalty!', 'excited');
     }
     if (newMoveHistory.length >= 10 && !badges.find(b => b.id === 'survive_10')?.earned) {
       earnBadge('survive_10');
@@ -495,7 +581,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (chess.isCheckmate() && !badges.find(b => b.id === 'first_checkmate')?.earned) {
       earnBadge('first_checkmate');
       addCoins(100);
-      setWizardMessage('🏆 CHECKMATE! You are a true Grand Master!', 'excited');
+      setWizardMessage(pickWizardLine('first_checkmate') || '🏆 CHECKMATE! You are a true Grand Master!', 'excited');
       // Scholar's mate check — 4 moves or fewer for current player
       const playerMoves = newMoveHistory.filter(m => m.color === playerColor);
       if (playerMoves.length <= 4 && !badges.find(b => b.id === 'scholar_mate')?.earned) {
@@ -536,14 +622,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (chess.isDraw()) {
-      setWizardMessage('🤝 A valiant draw! Both armies fought with honour.', 'happy');
+      setWizardMessage(pickWizardLine('draw') || '🤝 A valiant draw! Both armies fought with honour.', 'happy');
       set({ phase: 'gameover' });
     }
 
     // Soft wizard hints
     if (chess.isCheck() && !chess.isCheckmate()) {
       if (chess.turn() === playerColor) {
-        setWizardMessage('⚠️ Watch out! Your King is in check! Defend quickly!', 'warning');
+        setWizardMessage(pickWizardLine('check_warning') || '⚠️ Watch out! Your King is in check! Defend quickly!', 'warning');
       }
     }
 
@@ -639,6 +725,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       puzzleHintsUsed: 0,
       activeEndgameId: null,
       endgameMoveCount: 0,
+      activeOpeningId: null,
+      openingStep: 0,
     });
   },
 
@@ -967,6 +1055,49 @@ export const useGameStore = create<GameState>((set, get) => ({
       mode: 'vs-ai',
       activeEndgameId: null,
       endgameMoveCount: 0,
+    });
+    get().newGame();
+  },
+
+  // ── Opening Trainer mode ─────────────────────
+  startOpening: (openingId: string) => {
+    const opening = OPENINGS.find(o => o.id === openingId);
+    if (!opening) return;
+    // Openings always start from the standard initial position with the player as White.
+    const chess = new Chess();
+    set({
+      mode: 'opening',
+      activeOpeningId: openingId,
+      openingStep: 0,
+      activePuzzleId: null,
+      puzzleSolved: false,
+      activeEndgameId: null,
+      chess,
+      fen: chess.fen(),
+      history: [chess.fen()],
+      moveHistory: [],
+      playerColor: 'w',
+      selectedSquare: null,
+      validMoves: [],
+      lastMove: null,
+      aiThinking: false,
+      capturedPieces: { w: [], b: [] },
+      pendingPromotion: null,
+      pendingTimeSpell: null,
+      lastMoveQuality: null,
+      lastMoveQualityAt: 0,
+      lastMoveMotif: null,
+      phase: 'playing',
+      wizardMessage: `📚 Welcome to the ${opening.name}! ${opening.description} Play the suggested moves to learn the opening!`,
+      wizardEmotion: 'happy',
+    });
+  },
+
+  exitOpeningMode: () => {
+    set({
+      mode: 'vs-ai',
+      activeOpeningId: null,
+      openingStep: 0,
     });
     get().newGame();
   },
