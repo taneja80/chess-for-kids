@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../lib/gameStore';
 import { PUZZLES } from '../../lib/gameData';
+import { getDailyPuzzleId, getTodayDateStr } from '../../lib/daily';
 import styles from './QuestMap.module.css';
 
 interface QuestMapProps {
@@ -16,8 +17,19 @@ const DIFFICULTY_LABELS = {
 };
 
 export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
-  const { puzzleProgress, startPuzzle } = useGameStore();
+  const {
+    puzzleProgress,
+    startPuzzle,
+    dailyStreak,
+    dailyBestStreak,
+    lastDailyDate,
+  } = useGameStore();
   const [selectedQuest, setSelectedQuest] = useState<typeof PUZZLES[0] | null>(null);
+
+  const today = getTodayDateStr();
+  const dailyPuzzleId = getDailyPuzzleId(today);
+  const dailyPuzzle = PUZZLES.find((p) => p.id === dailyPuzzleId) || PUZZLES[0];
+  const dailyClaimedToday = lastDailyDate === today;
 
   const isPuzzleUnlocked = (puzzleId: string) => {
     if (puzzleId === 'p1') return true;
@@ -39,6 +51,11 @@ export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
     onAttemptQuest();
   };
 
+  const handleStartDaily = () => {
+    startPuzzle(dailyPuzzle.id);
+    onAttemptQuest();
+  };
+
   return (
     <div className={styles.mapContainer}>
       <div className={styles.mapHeader}>
@@ -46,6 +63,45 @@ export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
         <p className={styles.mapSubtitle}>
           Complete tactical chess puzzles sequentially to save the kingdom and earn massive chest rewards!
         </p>
+      </div>
+
+      {/* ── Daily Quest featured card ─────────────────── */}
+      <div
+        className={[styles.dailyCard, dailyClaimedToday ? styles.dailyDone : ''].join(' ')}
+        id="daily-quest-card"
+      >
+        <div className={styles.dailyLeft}>
+          <div className={styles.dailyEyebrow}>
+            <span className={styles.dailySparkle}>✨</span>
+            <span>Today&apos;s Daily Quest</span>
+          </div>
+          <h3 className={styles.dailyTitle}>{dailyPuzzle.title}</h3>
+          <p className={styles.dailyDesc}>{dailyPuzzle.description}</p>
+          <div className={styles.dailyMeta}>
+            <span className={styles.dailyReward}>🪙 {dailyPuzzle.reward * 2} gold (2× bonus!)</span>
+          </div>
+        </div>
+
+        <div className={styles.dailyRight}>
+          <div className={styles.streakBox} title={`Best streak: ${dailyBestStreak}`}>
+            <span className={styles.streakIcon}>🔥</span>
+            <div className={styles.streakInfo}>
+              <span className={styles.streakNum}>{dailyStreak}</span>
+              <span className={styles.streakLabel}>day streak</span>
+            </div>
+          </div>
+          {dailyClaimedToday ? (
+            <div className={styles.dailyDoneBadge}>✅ Claimed today</div>
+          ) : (
+            <button
+              id="btn-start-daily"
+              className={`btn btn-gold ${styles.dailyBtn}`}
+              onClick={handleStartDaily}
+            >
+              ⚔️ Play Today&apos;s Quest
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Interactive winding road map */}
@@ -57,6 +113,7 @@ export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
               const isUnlocked = isPuzzleUnlocked(puzzle.id);
               const isCurrent = isUnlocked && !isCompleted;
               const diff = DIFFICULTY_LABELS[puzzle.difficulty] || DIFFICULTY_LABELS.squire;
+              const isToday = puzzle.id === dailyPuzzleId;
 
               return (
                 <div key={puzzle.id} className={styles.nodeWrapper}>
@@ -77,6 +134,7 @@ export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
                       isCompleted ? styles.nodeCompleted : '',
                       isCurrent ? styles.nodeCurrent : '',
                       !isUnlocked ? styles.nodeLocked : '',
+                      isToday ? styles.nodeToday : '',
                     ].join(' ')}
                     onClick={() => handleQuestClick(puzzle)}
                     title={puzzle.title}
@@ -85,6 +143,7 @@ export default function QuestMap({ onAttemptQuest }: QuestMapProps) {
                       {isCompleted ? '🏆' : !isUnlocked ? '🔒' : diff.icon}
                     </div>
                     {isCurrent && <span className={styles.pulseRing} />}
+                    {isToday && <span className={styles.todayDot} aria-label="Today's daily quest">⭐</span>}
                   </div>
 
                   {/* Level details details below node */}

@@ -60,7 +60,8 @@
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.12s ease;
-  overflow: hidden;
+  /* Overflow visible so the move-quality badge (translateY out of the square) is not clipped. */
+  overflow: visible;
 }
 .square:focus {
   outline: 2px solid rgba(139, 92, 246, 0.8);
@@ -183,6 +184,42 @@
 @keyframes aiGlow {
   from { filter: drop-shadow(0 0 4px rgba(139,92,246,0.4)); }
   to   { filter: drop-shadow(0 0 12px rgba(139,92,246,0.9)); }
+}
+
+/* ── Move-quality coaching badge ─────────────── */
+.qualityBadge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: clamp(0.55rem, 1.4vmin, 0.78rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  animation: qualityFade 1.8s ease-out 1.4s forwards;
+}
+
+.qualityIcon {
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.qualityLabel {
+  line-height: 1;
+}
+
+@keyframes qualityFade {
+  to { opacity: 0; transform: translate(-50%, -22px) scale(0.9); }
 }
 
 /* ── Corner labels ───────────────────────────── */

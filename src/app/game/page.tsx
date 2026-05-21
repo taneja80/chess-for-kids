@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useGameStore } from '../../lib/gameStore';
 import { Square } from 'chess.js';
 import { initStockfish, getStockfishMove, terminateStockfish } from '../../lib/stockfish';
+import { initSound, isMuted, setMuted, unlock } from '../../lib/sounds';
+import { generateShareCard, downloadShareCard, copyShareCardToClipboard } from '../../lib/shareCard';
 import ChessBoard from '../components/ChessBoard';
 import WizardCoach from '../components/WizardCoach';
 import GameControls from '../components/GameControls';
@@ -21,6 +23,8 @@ export default function GamePage() {
   const router = useRouter();
   const stockfishReady = useRef(false);
   const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'armoury'>('arena');
+  const [soundOn, setSoundOn] = useState(true);
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   const {
     chess, fen, phase, mode, playerColor,
@@ -31,6 +35,42 @@ export default function GamePage() {
     loadSavedData,
     pendingTimeSpell,
   } = useGameStore();
+
+  // ── Init sound system on first user interaction ──
+  useEffect(() => {
+    initSound();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSoundOn(!isMuted());
+    const handler = () => { unlock(); };
+    window.addEventListener('pointerdown', handler, { once: true });
+    return () => window.removeEventListener('pointerdown', handler);
+  }, []);
+
+  const handleToggleSound = useCallback(() => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setMuted(!next);
+    unlock();
+  }, [soundOn]);
+
+  const handleShareVictory = useCallback(async () => {
+    const result: 'win' | 'loss' | 'draw' =
+      chess.isCheckmate()
+        ? (chess.turn() !== playerColor ? 'win' : 'loss')
+        : 'draw';
+    const dataUrl = generateShareCard({
+      chess,
+      moves: moveHistory.length,
+      difficulty,
+      result,
+      playerColor,
+    });
+    if (!dataUrl) return;
+    const copied = await copyShareCardToClipboard(dataUrl);
+    downloadShareCard(dataUrl);
+    setShareNotice(copied ? 'Saved + copied to clipboard! 📋✨' : 'Saved to downloads! 💾');
+    setTimeout(() => setShareNotice(null), 2800);
+  }, [chess, moveHistory.length, difficulty, playerColor]);
 
   // ── Load saved progress & cosmetics on client mount ──
   useEffect(() => {
@@ -106,9 +146,21 @@ export default function GamePage() {
           <h1 className={styles.headerText}>Chess for Kids</h1>
           <span className={styles.headerCrown}>♟</span>
         </div>
-        <div className={styles.moveCount}>
-          <span className={styles.moveLabel}>Moves</span>
-          <span className={styles.moveNum}>{moveHistory.length}</span>
+        <div className={styles.headerRight}>
+          <button
+            id="btn-sound-toggle"
+            type="button"
+            className={styles.soundBtn}
+            onClick={handleToggleSound}
+            aria-pressed={soundOn}
+            title={soundOn ? 'Mute sounds' : 'Enable sounds'}
+          >
+            {soundOn ? '🔊' : '🔇'}
+          </button>
+          <div className={styles.moveCount}>
+            <span className={styles.moveLabel}>Moves</span>
+            <span className={styles.moveNum}>{moveHistory.length}</span>
+          </div>
         </div>
       </header>
 
@@ -201,6 +253,15 @@ export default function GamePage() {
                 : 'A hard-fought battle. Well played!'}
             </p>
             <div className={styles.gameOverBtns}>
+              {chess.isCheckmate() && chess.turn() !== playerColor && (
+                <button
+                  id="btn-share-victory"
+                  className="btn btn-primary"
+                  onClick={handleShareVictory}
+                >
+                  📸 Share Victory
+                </button>
+              )}
               <button
                 id="btn-play-again"
                 className="btn btn-gold"
@@ -216,6 +277,9 @@ export default function GamePage() {
                 🏰 Home
               </button>
             </div>
+            {shareNotice && (
+              <div className={styles.shareNotice}>{shareNotice}</div>
+            )}
           </div>
         </div>
       )}

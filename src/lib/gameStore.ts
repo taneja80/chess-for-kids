@@ -7,6 +7,9 @@ import { rtdb } from './firebase';
 import { ref, set as setDb, onValue, get as getDb, update as updateDb, off } from 'firebase/database';
 import { PUZZLES } from './gameData';
 import { calculateTerritory } from './territory';
+import { classifyMove, MoveQuality } from './moveQuality';
+import { getDailyPuzzleId, getTodayDateStr, nextStreak } from './daily';
+import { playMove, playCapture, playCheck, playCheckmate, playLoss, playBadge, playCoins, playSelect } from './sounds';
 
 // ──────────────────────────────────────────────
 // Types
@@ -89,6 +92,15 @@ export interface GameState {
     opponentMove: Move;
   } | null;
 
+  // Move-quality feedback (transient — set on player move, cleared on next move/new game)
+  lastMoveQuality: MoveQuality | null;
+  lastMoveQualityAt: number; // ms timestamp so re-renders can re-trigger the badge animation
+
+  // Daily Quest tracking
+  dailyStreak: number;
+  dailyBestStreak: number;
+  lastDailyDate: string | null;
+
   // Actions
   selectSquare:       (square: Square) => void;
   makeMove:           (from: Square, to: Square, promotion?: string) => boolean;
@@ -159,6 +171,9 @@ interface LocalStoragePayload {
   currentSkin: string;
   puzzleProgress: Record<string, boolean>;
   badges: Badge[];
+  dailyStreak?: number;
+  dailyBestStreak?: number;
+  lastDailyDate?: string | null;
 }
 
 const saveToLocalStorage = (state: LocalStoragePayload) => {
@@ -172,6 +187,9 @@ const saveToLocalStorage = (state: LocalStoragePayload) => {
         currentSkin: state.currentSkin,
         puzzleProgress: state.puzzleProgress,
         badges: state.badges.map((b: Badge) => ({ id: b.id, earned: b.earned, earnedAt: b.earnedAt })),
+        dailyStreak: state.dailyStreak ?? 0,
+        dailyBestStreak: state.dailyBestStreak ?? 0,
+        lastDailyDate: state.lastDailyDate ?? null,
       }));
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
@@ -225,6 +243,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   timeSpellsRemaining: 3,
   pendingTimeSpell: null,
 
+  lastMoveQuality: null,
+  lastMoveQualityAt: 0,
+
+  dailyStreak: 0,
+  dailyBestStreak: 0,
+  lastDailyDate: null,
+
   // ── Select / click square ──────────────────
   selectSquare: (square) => {
     const { chess, selectedSquare, validMoves, aiThinking, playerColor, isMultiplayer } = get();
@@ -257,6 +282,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const moves = chess.moves({ square, verbose: true }) as Move[];
     const destinations = moves.map(m => m.to as Square);
     set({ selectedSquare: square, validMoves: destinations });
+    playSelect();
   },
 
   // ── Make a move ────────────────────────────
@@ -293,6 +319,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newHistory = [...history, newFen];
     const newMoveHistory = [...moveHistory, move];
 
+    // Classify the move for instant coaching feedback (player moves only).
+    const isPlayerMoveForQuality = move.color === playerColor;
+    const newQuality = isPlayerMoveForQuality ? classifyMove(chess, move, playerColor) : null;
+
     set({
       fen: newFen,
       history: newHistory,
@@ -302,7 +332,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMove: { from, to },
       capturedPieces: captured,
       pendingPromotion: null,
+      lastMoveQuality: newQuality,
+      lastMoveQualityAt: Date.now(),
     });
+
+    // ── Sound effects (procedural, fire-and-forget) ─────────────────────
+    if (chess.isCheckmate()) {
+      // Winner is the side that just moved.
+      if (move.color === playerColor) playCheckmate(); else playLoss();
+    } else if (chess.isCheck()) {
+      playCheck();
+    } else if (move.captured) {
+      playCapture();
+    } else {
+      playMove();
+    }
 
     // Intercept Puzzle Mode moves
     if (get().mode === 'puzzle') {
@@ -312,18 +356,42 @@ export const useGameStore = create<GameState>((set, get) => ({
         const playerMoveStr = from + to;
         const matchesSolution = puzzle.solution.includes(playerMoveStr);
         if (matchesSolution) {
+          // Check if this is today's Daily Quest — bonus reward + streak update.
+          const today = getTodayDateStr();
+          const isDaily =
+            puzzle.id === getDailyPuzzleId(today) &&
+            get().lastDailyDate !== today;
+          const bonus = isDaily ? puzzle.reward : 0;
+          const totalReward = puzzle.reward + bonus;
+
           set((state) => {
             const updatedProgress = { ...state.puzzleProgress, [puzzle.id]: true };
+            const newStreak = isDaily
+              ? nextStreak(state.dailyStreak, state.lastDailyDate, today)
+              : state.dailyStreak;
+            const newBest = isDaily ? Math.max(state.dailyBestStreak, newStreak) : state.dailyBestStreak;
             const newState = {
               ...state,
-              goldCoins: state.goldCoins + puzzle.reward,
+              goldCoins: state.goldCoins + totalReward,
               puzzleProgress: updatedProgress,
               puzzleSolved: true,
+              dailyStreak: newStreak,
+              dailyBestStreak: newBest,
+              lastDailyDate: isDaily ? today : state.lastDailyDate,
             };
             saveToLocalStorage(newState);
             return newState;
           });
-          get().setWizardMessage(`🏆 Quest Complete! Excellent move! You earned ${puzzle.reward} gold coins!`, 'excited');
+          playCheckmate();
+          playCoins(isDaily ? 4 : 2);
+          if (isDaily) {
+            get().setWizardMessage(
+              `🔥 Daily Quest complete! Streak: ${get().dailyStreak}. Bonus ${bonus} gold — total ${totalReward}!`,
+              'excited'
+            );
+          } else {
+            get().setWizardMessage(`🏆 Quest Complete! Excellent move! You earned ${totalReward} gold coins!`, 'excited');
+          }
         } else {
           get().setWizardMessage('❌ Not quite! That was not the winning move. Try again!', 'warning');
           setTimeout(() => {
@@ -506,6 +574,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       roomId: null,
       timeSpellsRemaining: 3,
       pendingTimeSpell: null,
+      lastMoveQuality: null,
+      lastMoveQualityAt: 0,
     });
   },
 
@@ -532,6 +602,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
       // Persist immediately — kids close the tab right after winning.
       saveToLocalStorage({ ...state, badges: updatedBadges });
+      playBadge();
       return { badges: updatedBadges };
     }),
 
@@ -539,6 +610,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const newCoins = state.goldCoins + n;
       saveToLocalStorage({ ...state, goldCoins: newCoins });
+      if (n > 0) playCoins(Math.min(4, Math.ceil(n / 20)));
       return { goldCoins: newCoins };
     }),
 
@@ -922,6 +994,9 @@ export const useGameStore = create<GameState>((set, get) => ({
             currentSkin: parsed.currentSkin || state.currentSkin,
             puzzleProgress: parsed.puzzleProgress || state.puzzleProgress,
             badges: updatedBadges,
+            dailyStreak: typeof parsed.dailyStreak === 'number' ? parsed.dailyStreak : state.dailyStreak,
+            dailyBestStreak: typeof parsed.dailyBestStreak === 'number' ? parsed.dailyBestStreak : state.dailyBestStreak,
+            lastDailyDate: parsed.lastDailyDate ?? state.lastDailyDate,
           };
         });
       }
