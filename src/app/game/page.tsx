@@ -21,12 +21,13 @@ import PuzzleControls from '../components/PuzzleControls';
 import EndgameTrainer from '../components/EndgameTrainer';
 import OpeningTrainer from '../components/OpeningTrainer';
 import CoachReplay from '../components/CoachReplay';
+import SavedGamesPanel from '../components/SavedGamesPanel';
 import styles from './page.module.css';
 
 export default function GamePage() {
   const router = useRouter();
   const stockfishReady = useRef(false);
-  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'openings' | 'armoury' | 'halloffame'>('arena');
+  const [activeTab, setActiveTab] = useState<'arena' | 'quests' | 'endgame' | 'openings' | 'armoury' | 'halloffame' | 'saved'>('arena');
   const [soundOn, setSoundOn] = useState(true);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
@@ -226,6 +227,12 @@ export default function GamePage() {
         >
           🏆 Hall of Fame
         </button>
+        <button
+          className={activeTab === 'saved' ? styles.tabNavActive : styles.tabNavBtn}
+          onClick={() => setActiveTab('saved')}
+        >
+          💾 Saved Games
+        </button>
       </nav>
 
       {/* Main layout */}
@@ -244,6 +251,9 @@ export default function GamePage() {
         )}
         {activeTab === 'halloffame' && (
           <HallOfFame />
+        )}
+        {activeTab === 'saved' && (
+          <SavedGamesPanel onResume={() => setActiveTab('arena')} />
         )}
         {activeTab === 'arena' && (
           <>

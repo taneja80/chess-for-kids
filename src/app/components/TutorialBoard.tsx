@@ -269,7 +269,7 @@ export default function TutorialBoard({ quest, onSuccess }: TutorialBoardProps) 
                     <span className={styles.cornerRank}>{rank}</span>
                   )}
                   {ri === 7 && (
-                    <span className={styles.cornerFile}>{file}</span>
+                    <span className={styles.cornerFile}>{file.toUpperCase()}</span>
                   )}
                 </div>
               );

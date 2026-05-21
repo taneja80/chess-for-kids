@@ -28,6 +28,25 @@ export interface Badge {
   earnedAt?: number;
 }
 
+export interface PlayerProfile {
+  name: string;
+  avatar: string; // emoji or avatar id
+  createdAt: number;
+}
+
+export interface SavedGame {
+  id: string;
+  name: string;
+  pgn: string;
+  fen: string;
+  mode: GameMode;
+  difficulty: Difficulty;
+  playerColor: PlayerColor;
+  moveCount: number;
+  savedAt: number;
+  result?: 'in-progress' | 'win' | 'loss' | 'draw';
+}
+
 export type GamePhase = 'home' | 'tutorial' | 'playing' | 'gameover';
 export type GameMode  = 'vs-ai' | 'vs-friend' | 'puzzle' | 'endgame' | 'opening';
 export type PlayerColor = 'w' | 'b';
@@ -122,6 +141,10 @@ export interface GameState {
   aiRecord: Record<Difficulty, ('w' | 'l' | 'd')[]>;
   suggestedDifficulty: Difficulty | null;
 
+  // Player Profile & Saved Games
+  playerProfile: PlayerProfile | null;
+  savedGames: SavedGame[];
+
   // Actions
   selectSquare:       (square: Square) => void;
   makeMove:           (from: Square, to: Square, promotion?: string) => boolean;
@@ -161,6 +184,13 @@ export interface GameState {
   declineTimeSpell:   () => void;
   resetTimeSpells:    () => void;
   loadSavedData:      () => void;
+
+  // Profile & Saved Game Actions
+  setProfile:         (profile: { name: string; avatar: string }) => void;
+  clearProfile:       () => void;
+  saveCurrentGame:    (name?: string) => string;
+  loadSavedGame:      (id: string) => boolean;
+  deleteSavedGame:    (id: string) => void;
 
   // Multiplayer Actions
   createMultiplayerRoom: () => Promise<string>;
@@ -294,6 +324,8 @@ interface LocalStoragePayload {
   dailyBestStreak?: number;
   lastDailyDate?: string | null;
   aiRecord?: Record<string, ('w' | 'l' | 'd')[]>;
+  playerProfile?: PlayerProfile | null;
+  savedGames?: SavedGame[];
 }
 
 const saveToLocalStorage = (state: LocalStoragePayload) => {
@@ -313,6 +345,8 @@ const saveToLocalStorage = (state: LocalStoragePayload) => {
         dailyBestStreak: state.dailyBestStreak ?? 0,
         lastDailyDate: state.lastDailyDate ?? null,
         aiRecord: state.aiRecord ?? {},
+        playerProfile: state.playerProfile ?? null,
+        savedGames: state.savedGames ?? [],
       }));
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
@@ -352,6 +386,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentSkin: 'classic',
   unlockedAvatars: ['squire'],
   currentAvatar: 'squire',
+
+  // Player profile & saved games
+  playerProfile: null,
+  savedGames: [],
 
   // Puzzle progress
   puzzleProgress: {},
@@ -1353,6 +1391,137 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ timeSpellsRemaining: 3, pendingTimeSpell: null });
   },
 
+  // ── Player Profile ───────────────────────────
+  setProfile: ({ name, avatar }) => {
+    const trimmed = name.trim().slice(0, 24) || 'Brave Squire';
+    set((state) => {
+      const profile: PlayerProfile = {
+        name: trimmed,
+        avatar: avatar || '🛡️',
+        createdAt: state.playerProfile?.createdAt ?? Date.now(),
+      };
+      const newState = { ...state, playerProfile: profile };
+      saveToLocalStorage(newState);
+      return { playerProfile: profile };
+    });
+  },
+
+  clearProfile: () => {
+    set((state) => {
+      const newState = { ...state, playerProfile: null };
+      saveToLocalStorage(newState);
+      return { playerProfile: null };
+    });
+  },
+
+  // ── Saved Games ──────────────────────────────
+  saveCurrentGame: (name) => {
+    const state = get();
+    const id = `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const finalName =
+      (name && name.trim()) ||
+      `${state.playerProfile?.name ?? 'Squire'} vs ${state.mode === 'vs-ai' ? state.difficulty : state.mode} — ${new Date().toLocaleString()}`;
+
+    const pgn = state.chess.pgn();
+    const fen = state.chess.fen();
+    const result: SavedGame['result'] =
+      state.phase === 'gameover'
+        ? state.chess.isCheckmate()
+          ? state.chess.turn() !== state.playerColor
+            ? 'win'
+            : 'loss'
+          : 'draw'
+        : 'in-progress';
+
+    const entry: SavedGame = {
+      id,
+      name: finalName,
+      pgn,
+      fen,
+      mode: state.mode,
+      difficulty: state.difficulty,
+      playerColor: state.playerColor,
+      moveCount: state.moveHistory.length,
+      savedAt: Date.now(),
+      result,
+    };
+
+    set((s) => {
+      // Keep only the most recent 50 saved games to avoid bloating localStorage
+      const nextSavedGames = [entry, ...s.savedGames].slice(0, 50);
+      const newState = { ...s, savedGames: nextSavedGames };
+      saveToLocalStorage(newState);
+      return { savedGames: nextSavedGames };
+    });
+
+    get().setWizardMessage(`💾 Game saved: "${finalName.slice(0, 40)}"`, 'happy');
+    return id;
+  },
+
+  loadSavedGame: (id) => {
+    const entry = get().savedGames.find((g) => g.id === id);
+    if (!entry) return false;
+    try {
+      const chess = new Chess();
+      // Prefer PGN replay so we keep full moveHistory; fall back to FEN-only.
+      let usedPgn = false;
+      if (entry.pgn && entry.pgn.trim()) {
+        try {
+          chess.loadPgn(entry.pgn);
+          usedPgn = true;
+        } catch {
+          usedPgn = false;
+        }
+      }
+      if (!usedPgn) {
+        chess.load(entry.fen);
+      }
+
+      const moveHistory = chess.history({ verbose: true }) as Move[];
+
+      set({
+        chess,
+        fen: chess.fen(),
+        history: [chess.fen()],
+        moveHistory,
+        selectedSquare: null,
+        validMoves: [],
+        lastMove: moveHistory.length
+          ? { from: moveHistory[moveHistory.length - 1].from as Square, to: moveHistory[moveHistory.length - 1].to as Square }
+          : null,
+        mode: entry.mode,
+        difficulty: entry.difficulty,
+        playerColor: entry.playerColor,
+        phase: chess.isGameOver() ? 'gameover' : 'playing',
+        capturedPieces: { w: [], b: [] },
+        pendingPromotion: null,
+        pendingTimeSpell: null,
+        aiThinking: false,
+        isMultiplayer: false,
+        roomId: null,
+        activePuzzleId: null,
+        puzzleSolved: false,
+        activeEndgameId: null,
+        activeOpeningId: null,
+      });
+
+      get().setWizardMessage(`📂 Loaded: "${entry.name.slice(0, 40)}"`, 'excited');
+      return true;
+    } catch (e) {
+      console.error('Failed to load saved game:', e);
+      return false;
+    }
+  },
+
+  deleteSavedGame: (id) => {
+    set((state) => {
+      const nextSavedGames = state.savedGames.filter((g) => g.id !== id);
+      const newState = { ...state, savedGames: nextSavedGames };
+      saveToLocalStorage(newState);
+      return { savedGames: nextSavedGames };
+    });
+  },
+
   loadSavedData: () => {
     if (typeof window === 'undefined') return;
     try {
@@ -1384,6 +1553,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             aiRecord: parsed.aiRecord
               ? { ...state.aiRecord, ...parsed.aiRecord }
               : state.aiRecord,
+            playerProfile: parsed.playerProfile ?? state.playerProfile,
+            savedGames: Array.isArray(parsed.savedGames) ? parsed.savedGames : state.savedGames,
           };
         });
       }

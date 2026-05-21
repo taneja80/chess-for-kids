@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '../lib/gameStore';
+import PlayerProfile from './components/PlayerProfile';
 import styles from './page.module.css';
 
 const FEATURES = [
@@ -49,8 +50,13 @@ const PIECES = [
 ];
 
 export default function HomePage() {
-  const { newGame, setPhase } = useGameStore();
+  const { newGame, setPhase, loadSavedData } = useGameStore();
   const router = useRouter();
+
+  // Restore profile + saved games on mount so the home screen reflects them.
+  useEffect(() => {
+    loadSavedData();
+  }, [loadSavedData]);
 
   const handlePlay = () => {
     newGame();
@@ -102,6 +108,11 @@ export default function HomePage() {
             <Link href="/tutorial" id="btn-learn" className={`btn btn-primary ${styles.heroBtn}`}>
               🎓 Learn First
             </Link>
+          </div>
+
+          {/* Profile card (create or welcome-back) */}
+          <div className={styles.profileSlot}>
+            <PlayerProfile />
           </div>
 
           {/* Mini piece showcase */}

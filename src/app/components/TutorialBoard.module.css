@@ -238,6 +238,8 @@
   opacity: 0.55;
   pointer-events: none;
   font-family: var(--font-display, 'Cinzel', serif);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .cornerRank {

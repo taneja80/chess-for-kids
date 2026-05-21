@@ -267,6 +267,9 @@
   color: rgba(226, 213, 248, 0.6);
   width: 1.2rem;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
 }
 
 /* ── AI thinking overlay ─────────────────────── */

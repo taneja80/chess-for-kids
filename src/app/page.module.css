@@ -166,6 +166,14 @@
   letter-spacing: 0.05em;
 }
 
+.profileSlot {
+  margin-top: 1.25rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  animation: slideUp 0.5s ease-out 0.45s both;
+}
+
 @keyframes slideUp {
   from { transform: translateY(24px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
