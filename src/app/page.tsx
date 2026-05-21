@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useGameStore } from '../lib/gameStore';
 import styles from './page.module.css';
 
@@ -49,10 +50,12 @@ const PIECES = [
 
 export default function HomePage() {
   const { newGame, setPhase } = useGameStore();
+  const router = useRouter();
 
   const handlePlay = () => {
     newGame();
     setPhase('playing');
+    router.push('/game');
   };
 
   return (
@@ -89,15 +92,15 @@ export default function HomePage() {
           </p>
 
           <div className={styles.heroCta}>
-            <Link href="/game" id="btn-play-now">
-              <button className={`btn btn-gold ${styles.heroBtn}`} onClick={handlePlay}>
-                ⚔️ Play Now!
-              </button>
-            </Link>
-            <Link href="/tutorial" id="btn-learn">
-              <button className={`btn btn-primary ${styles.heroBtn}`}>
-                🎓 Learn First
-              </button>
+            <button
+              id="btn-play-now"
+              className={`btn btn-gold ${styles.heroBtn}`}
+              onClick={handlePlay}
+            >
+              ⚔️ Play Now!
+            </button>
+            <Link href="/tutorial" id="btn-learn" className={`btn btn-primary ${styles.heroBtn}`}>
+              🎓 Learn First
             </Link>
           </div>
 
@@ -157,11 +160,13 @@ export default function HomePage() {
           <p className={styles.finalCtaDesc}>
             The chessboard awaits. Will you become the next Grand Master?
           </p>
-          <Link href="/game">
-            <button className={`btn btn-gold ${styles.finalCtaBtn}`} onClick={handlePlay}>
-              ♟️ Start Playing Now
-            </button>
-          </Link>
+          <button
+            id="btn-start-playing"
+            className={`btn btn-gold ${styles.finalCtaBtn}`}
+            onClick={handlePlay}
+          >
+            ♟️ Start Playing Now
+          </button>
         </div>
       </section>
 

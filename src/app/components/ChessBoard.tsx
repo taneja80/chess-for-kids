@@ -27,6 +27,7 @@ const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
 export default function ChessBoard() {
   const {
     chess,
+    fen,
     selectedSquare,
     validMoves,
     lastMove,
@@ -41,8 +42,11 @@ export default function ChessBoard() {
   const displayRanks = playerColor === 'b' ? [...RANKS].reverse() : RANKS;
   const displayFiles = playerColor === 'b' ? [...FILES].reverse() : FILES;
 
-  // Calculate territory control for all squares
-  const territory = useMemo(() => calculateTerritory(chess), [chess]);
+  // Calculate territory control for all squares — depend on FEN so it recomputes
+  // every move (the `chess` object is mutated in place by chess.js, so depending on
+  // `chess` alone would give stale memoized results).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const territory = useMemo(() => calculateTerritory(chess), [fen]);
 
   const handleSquareClick = useCallback(
     (square: Square) => {

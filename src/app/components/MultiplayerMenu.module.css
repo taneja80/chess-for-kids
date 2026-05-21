@@ -60,6 +60,7 @@
 
 .input {
   flex: 1;
+  min-width: 0;
   background: rgba(15, 8, 28, 0.6);
   border: 1px solid rgba(74, 50, 120, 0.5);
   border-radius: 8px;
@@ -85,6 +86,8 @@
 
 .joinBtn {
   padding: 0.6rem 1rem;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .activeRoom {

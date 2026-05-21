@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { Chess, Move, Square } from 'chess.js';
 import { Difficulty } from './stockfish';
 import { rtdb } from './firebase';
-import { ref, set as setDb, onValue, get as getDb } from 'firebase/database';
+import { ref, set as setDb, onValue, get as getDb, update as updateDb, off } from 'firebase/database';
 import { PUZZLES } from './gameData';
 import { calculateTerritory } from './territory';
 
@@ -142,7 +142,11 @@ const INITIAL_BADGES: Badge[] = [
   { id: 'beat_ai_squire',  name: 'Squire Slayer',  description: 'Defeated the Squire AI!',             icon: '🗡️', earned: false },
   { id: 'beat_ai_knight',  name: 'Knight Vanquisher', description: 'Defeated the Knight AI!',          icon: '🦄', earned: false },
   { id: 'beat_ai_bishop',  name: 'Bishop Bane',    description: 'Defeated the Bishop AI!',             icon: '⛪', earned: false },
+  { id: 'beat_ai_king',    name: 'King\'s Conqueror', description: 'Defeated the King AI — the ultimate triumph!', icon: '👑', earned: false },
 ];
+
+// Module-level handle for the active multiplayer subscription so we can clean it up on leave.
+let multiplayerUnsubscribe: (() => void) | null = null;
 
 // ──────────────────────────────────────────────
 // Store
@@ -336,9 +340,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { isMultiplayer, roomId } = get();
     if (isMultiplayer && roomId) {
       const gameRef = ref(rtdb, `games/${roomId}`);
-      setDb(gameRef, {
+      updateDb(gameRef, {
         fen: newFen,
         lastMove: { from, to },
+        lastSan: move.san,
+        lastCaptured: move.captured || null,
         turn: chess.turn(),
         timestamp: Date.now()
       }).catch(e => console.error("Firebase sync error:", e));
@@ -393,7 +399,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       // Beat AI badges
       if (get().mode === 'vs-ai') {
-        const aiId = difficulty === 'squire' ? 'beat_ai_squire' : difficulty === 'knight' ? 'beat_ai_knight' : difficulty === 'bishop' ? 'beat_ai_bishop' : null;
+        const aiId =
+          difficulty === 'squire' ? 'beat_ai_squire' :
+          difficulty === 'knight' ? 'beat_ai_knight' :
+          difficulty === 'bishop' ? 'beat_ai_bishop' :
+          difficulty === 'king'   ? 'beat_ai_king'   : null;
         if (aiId && !badges.find(b => b.id === aiId)?.earned) {
           earnBadge(aiId);
           addCoins(50);
@@ -419,23 +429,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (get().mode === 'vs-ai' && isPlayerMove && get().timeSpellsRemaining > 0 && !get().pendingTimeSpell) {
       const nextMoves = chess.moves({ verbose: true }) as Move[];
       const territory = calculateTerritory(chess);
+      const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 
       const heavyThreat = nextMoves.find(m => {
-        // 1. Check if the opponent can capture an undefended major piece
-        if (m.captured && ['q', 'r', 'b', 'n'].includes(m.captured)) {
-          const targetSquare = m.to;
-          const targetPieceControls = territory[targetSquare];
-          const friendlyControls = playerColor === 'w' ? targetPieceControls.whiteControls : targetPieceControls.blackControls;
-          if (friendlyControls === 0) {
-            return true;
+        // 1. Opponent can capture a piece worth >= 3 (knight or up) that is undefended.
+        if (m.captured && (PIECE_VALUES[m.captured] ?? 0) >= 3) {
+          const sqControl = territory[m.to];
+          if (sqControl) {
+            const friendlyControls = playerColor === 'w' ? sqControl.whiteControls : sqControl.blackControls;
+            if (friendlyControls === 0) return true;
           }
         }
 
-        // 2. Check if the opponent can deliver a check
+        // 2. Opponent can deliver immediate checkmate.
         const clone = new Chess(chess.fen());
         try {
           clone.move(m.san);
-          if (clone.isCheck()) return true;
+          if (clone.isCheckmate()) return true;
         } catch {}
 
         return false;
@@ -514,21 +524,36 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ wizardMessage: null, wizardEmotion: 'idle' }),
 
   earnBadge: (id) =>
-    set((state) => ({
-      badges: state.badges.map(b =>
-        b.id === id && !b.earned ? { ...b, earned: true, earnedAt: Date.now() } : b
-      ),
-    })),
+    set((state) => {
+      // Only award if not already earned
+      if (state.badges.find(b => b.id === id)?.earned) return state;
+      const updatedBadges = state.badges.map(b =>
+        b.id === id ? { ...b, earned: true, earnedAt: Date.now() } : b
+      );
+      // Persist immediately — kids close the tab right after winning.
+      saveToLocalStorage({ ...state, badges: updatedBadges });
+      return { badges: updatedBadges };
+    }),
 
   addCoins: (n) =>
-    set((state) => ({ goldCoins: state.goldCoins + n })),
+    set((state) => {
+      const newCoins = state.goldCoins + n;
+      saveToLocalStorage({ ...state, goldCoins: newCoins });
+      return { goldCoins: newCoins };
+    }),
 
   // ── Multiplayer Logic ────────────────────────
   createMultiplayerRoom: async () => {
+    // Clean up any prior subscription before creating a new room
+    if (multiplayerUnsubscribe) {
+      multiplayerUnsubscribe();
+      multiplayerUnsubscribe = null;
+    }
+
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const chess = new Chess();
     const initialFen = chess.fen();
-    
+
     set({
       isMultiplayer: true,
       roomId,
@@ -552,27 +577,47 @@ export const useGameStore = create<GameState>((set, get) => ({
       status: 'waiting'
     });
 
-    // Listen for opponent moves
+    // Listen for opponent moves and sync history + captured pieces locally.
     onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
-      if (data && data.fen && data.fen !== get().fen) {
+      const state = get();
+      if (data && data.fen && data.fen !== state.fen) {
         const newChess = new Chess(data.fen);
+        const newHistory = [...state.history, data.fen];
+        const newCaptured = { w: [...state.capturedPieces.w], b: [...state.capturedPieces.b] };
+        if (data.lastCaptured) {
+          // After the move, `newChess.turn()` is the side to move NEXT, so the capturer is the opposite color.
+          const capColor: PlayerColor = newChess.turn() === 'w' ? 'b' : 'w';
+          newCaptured[capColor].push(data.lastCaptured);
+        }
         set({
           fen: data.fen,
           chess: newChess,
+          history: newHistory,
           lastMove: data.lastMove || null,
+          capturedPieces: newCaptured,
+          selectedSquare: null,
+          validMoves: [],
         });
       }
     });
+    multiplayerUnsubscribe = () => {
+      off(gameRef);
+    };
 
     return roomId;
   },
 
   joinMultiplayerRoom: async (roomId: string) => {
+    if (multiplayerUnsubscribe) {
+      multiplayerUnsubscribe();
+      multiplayerUnsubscribe = null;
+    }
+
     roomId = roomId.toUpperCase();
     const gameRef = ref(rtdb, `games/${roomId}`);
     const snapshot = await getDb(gameRef);
-    
+
     if (!snapshot.exists()) {
       get().setWizardMessage(`Room ${roomId} not found!`, 'sad');
       return false;
@@ -588,32 +633,53 @@ export const useGameStore = create<GameState>((set, get) => ({
       playerColor: 'b', // Joiner is black
       chess: newChess,
       fen: data.fen,
+      history: [data.fen],
+      moveHistory: [],
+      capturedPieces: { w: [], b: [] },
       lastMove: data.lastMove || null,
       phase: 'playing',
       wizardMessage: 'Joined successfully! You are playing as Black.',
       wizardEmotion: 'excited'
     });
 
-    // Mark as joined
-    await setDb(gameRef, { ...data, status: 'playing' });
+    // Mark as joined without clobbering room metadata.
+    await updateDb(gameRef, { status: 'playing' });
 
     // Listen for moves
     onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
-      if (data && data.fen && data.fen !== get().fen) {
-        const chess = new Chess(data.fen);
+      const state = get();
+      if (data && data.fen && data.fen !== state.fen) {
+        const chessRemote = new Chess(data.fen);
+        const newHistory = [...state.history, data.fen];
+        const newCaptured = { w: [...state.capturedPieces.w], b: [...state.capturedPieces.b] };
+        if (data.lastCaptured) {
+          const capColor: PlayerColor = chessRemote.turn() === 'w' ? 'b' : 'w';
+          newCaptured[capColor].push(data.lastCaptured);
+        }
         set({
           fen: data.fen,
-          chess,
+          chess: chessRemote,
+          history: newHistory,
           lastMove: data.lastMove || null,
+          capturedPieces: newCaptured,
+          selectedSquare: null,
+          validMoves: [],
         });
       }
     });
+    multiplayerUnsubscribe = () => {
+      off(gameRef);
+    };
 
     return true;
   },
 
   leaveMultiplayerRoom: () => {
+    if (multiplayerUnsubscribe) {
+      multiplayerUnsubscribe();
+      multiplayerUnsubscribe = null;
+    }
     set({
       isMultiplayer: false,
       roomId: null,
@@ -692,12 +758,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       fen: chess.fen(),
       history: [chess.fen()],
       moveHistory: [],
+      // Make sure the player gets to move the side whose turn it is in the puzzle FEN.
+      // Otherwise (e.g., a user who toggled "Play as Black") pieces become unselectable.
+      playerColor: chess.turn(),
       selectedSquare: null,
       validMoves: [],
       lastMove: null,
       aiThinking: false,
       capturedPieces: { w: [], b: [] },
       pendingPromotion: null,
+      pendingTimeSpell: null,
       phase: 'playing',
       puzzleSolved: false,
       puzzleHintsUsed: 0,
@@ -745,23 +815,31 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { pendingTimeSpell, timeSpellsRemaining, chess } = get();
     if (!pendingTimeSpell || timeSpellsRemaining <= 0) return;
 
-    // 1. Temporarily play the AI's threatening move to show the player what happens
+    // Immediately lock further interaction: close the modal, mark AI as "thinking" so
+    // the player can't double-click and the board click handler ignores input,
+    // and consume the spell charge up-front.
+    set({
+      pendingTimeSpell: null,
+      aiThinking: true,
+      timeSpellsRemaining: timeSpellsRemaining - 1,
+    });
+
+    // 1. Temporarily play the AI's threatening move so the player sees the consequence.
     const tempChess = new Chess(chess.fen());
     try {
       tempChess.move(pendingTimeSpell.opponentMove.san);
       set({
         chess: tempChess,
         fen: tempChess.fen(),
-        wizardMessage: `🔮 Future Revealed: The opponent will play ${pendingTimeSpell.opponentMove.san} to capture your piece or check you! Rewinding timeline...`,
+        wizardMessage: `🔮 Future Revealed: The opponent will play ${pendingTimeSpell.opponentMove.san}! Rewinding timeline…`,
         wizardEmotion: 'warning'
       });
     } catch {}
 
-    // 2. Wait 2 seconds, then undo both moves (AI's capture and player's blunder)
+    // 2. Wait 2 seconds, then undo the player's blundered move and restore the board.
     setTimeout(() => {
       const { history, moveHistory } = get();
       if (history.length > 1) {
-        // Pop the blundered move
         const restoredHistory = history.slice(0, -1);
         const restoredMoveHistory = moveHistory.slice(0, -1);
         const restoredFen = restoredHistory[restoredHistory.length - 1];
@@ -772,19 +850,49 @@ export const useGameStore = create<GameState>((set, get) => ({
           fen: restoredFen,
           history: restoredHistory,
           moveHistory: restoredMoveHistory,
-          pendingTimeSpell: null,
-          timeSpellsRemaining: timeSpellsRemaining - 1,
-          wizardMessage: `⌛ Timeline Restored! Merlin the Wise saved you. Choose a different move!`,
+          aiThinking: false,
+          wizardMessage: `⌛ Timeline Restored! Merlin saved you. Choose a different move!`,
           wizardEmotion: 'happy',
           selectedSquare: null,
           validMoves: [],
+          lastMove: null,
         });
+      } else {
+        set({ aiThinking: false });
       }
     }, 2000);
   },
 
   declineTimeSpell: () => {
-    set({ pendingTimeSpell: null });
+    // The player is brave (or stubborn) — force the AI to actually play the move
+    // Merlin warned about, otherwise Stockfish might pick a different reply and the
+    // earlier warning would feel like a lie.
+    const { pendingTimeSpell, chess } = get();
+    if (!pendingTimeSpell) {
+      set({ pendingTimeSpell: null });
+      return;
+    }
+
+    set({ pendingTimeSpell: null, aiThinking: true });
+
+    // Tiny delay so the modal animates out before the AI's "punishment" lands.
+    setTimeout(() => {
+      const opp = pendingTimeSpell.opponentMove;
+      try {
+        // Reuse makeMove so badges, captured pieces, history, and game-over all wire up.
+        const ok = get().makeMove(opp.from as Square, opp.to as Square, opp.promotion);
+        if (!ok) {
+          // Fallback: legality changed somehow — let Stockfish take over next tick.
+          const fresh = new Chess(chess.fen());
+          const legal = fresh.moves({ verbose: true }) as Move[];
+          if (legal.length > 0) {
+            const m = legal[0];
+            get().makeMove(m.from as Square, m.to as Square);
+          }
+        }
+      } catch {}
+      set({ aiThinking: false });
+    }, 350);
   },
 
   resetTimeSpells: () => {

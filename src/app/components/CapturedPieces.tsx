@@ -27,6 +27,11 @@ export default function CapturedPieces() {
   const aiScore = score(aiCaptures);
   const advantage = myScore - aiScore;
 
+  // Pieces I captured are the OPPONENT's color, and vice-versa.
+  // (`pieceLight` renders glyphs in white, `pieceDark` in dark — match to actual piece color.)
+  const myPieceClass = playerColor === 'w' ? styles.pieceDark : styles.pieceLight;
+  const aiPieceClass = playerColor === 'w' ? styles.pieceLight : styles.pieceDark;
+
   return (
     <div className={styles.container}>
       <div className={styles.row}>
@@ -35,7 +40,7 @@ export default function CapturedPieces() {
           {myCaptures.length === 0
             ? <span className={styles.empty}>—</span>
             : myCaptures.map((p, i) => (
-                <span key={i} className={`${styles.piece} ${styles.pieceDark}`}>
+                <span key={i} className={`${styles.piece} ${myPieceClass}`}>
                   {PIECE_UNICODE[p]}
                 </span>
               ))
@@ -49,7 +54,7 @@ export default function CapturedPieces() {
           {aiCaptures.length === 0
             ? <span className={styles.empty}>—</span>
             : aiCaptures.map((p, i) => (
-                <span key={i} className={`${styles.piece} ${styles.pieceLight}`}>
+                <span key={i} className={`${styles.piece} ${aiPieceClass}`}>
                   {PIECE_UNICODE[p]}
                 </span>
               ))
